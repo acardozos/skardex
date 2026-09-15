@@ -3,6 +3,8 @@ name = "skardex"
 version = "0.1.0"
 description = "Webapp simple de control de materiales e insumos (kardex)"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Adolfo J. Cardozo S.", email = "ajcs.developer@gmail.com" }
 ]
