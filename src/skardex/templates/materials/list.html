@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Materiales — Simple Kardex{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Materiales</h1>
+    <p>Catálogo de materiales e insumos</p>
+</hgroup>
+
+{% if user.role == "admin" %}
+<p><a href="/materials/new" role="button">Nuevo material</a></p>
+{% endif %}
+
+<table>
+    <thead>
+        <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Unidad</th>
+            <th>Stock mínimo</th>
+            <th>Estado</th>
+            {% if user.role == "admin" %}
+            <th>Acciones</th>
+            {% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for material in materials %}
+        <tr>
+            <td>{{ material.code or "-" }}</td>
+            <td>{{ material.name }}</td>
+            <td>{{ material.unit }}</td>
+            <td>{{ material.min_stock if material.min_stock is not none else "-" }}</td>
+            <td>{{ "Activo" if material.is_active else "Inactivo" }}</td>
+            {% if user.role == "admin" %}
+            <td>
+                <a href="/materials/{{ material.id }}/edit">Editar</a>
+                {% if material.is_active %}
+                <form method="post" action="/materials/{{ material.id }}/deactivate" style="display:inline;">
+                    <button type="submit" class="secondary">Desactivar</button>
+                </form>
+                {% endif %}
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

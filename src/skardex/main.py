@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from skardex.config import settings
-from skardex.routers import auth
+from skardex.routers import auth, materials
 from skardex.security import NotAuthenticatedError
 
 
@@ -11,6 +11,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Simple Kardex")
     app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
     app.include_router(auth.router)
+    app.include_router(materials.router)
 
     @app.exception_handler(NotAuthenticatedError)
     async def not_authenticated_handler(

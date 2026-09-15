@@ -79,3 +79,19 @@ def inactive_user(db_session: Session) -> User:
     db_session.commit()
     db_session.refresh(user)
     return user
+
+
+@pytest.fixture
+def admin_client(client: TestClient, admin_user: User) -> TestClient:
+    client.post(
+        "/login", data={"username": admin_user.username, "password": "admin-pass"}
+    )
+    return client
+
+
+@pytest.fixture
+def operario_client(client: TestClient, operario_user: User) -> TestClient:
+    client.post(
+        "/login", data={"username": operario_user.username, "password": "operario-pass"}
+    )
+    return client
