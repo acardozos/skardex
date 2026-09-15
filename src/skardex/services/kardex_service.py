@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
@@ -5,6 +6,19 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from skardex.models import Material, Movement, MovementType, User
+
+
+@dataclass
+class MaterialStockStatus:
+    material: Material
+    balance: Decimal
+    is_low: bool
+
+
+@dataclass
+class DashboardData:
+    items: list[MaterialStockStatus]
+    low_stock_count: int
 
 
 class InvalidQuantityError(Exception):
@@ -48,6 +62,29 @@ def get_balances_for_active_materials(db: Session) -> dict[int, Decimal]:
         .all()
     )
     return {material_id: Decimal(str(total)) for material_id, total in rows}
+
+
+def get_dashboard_data(db: Session) -> DashboardData:
+    materials = (
+        db.query(Material)
+        .filter(Material.is_active.is_(True))
+        .order_by(Material.name)
+        .all()
+    )
+    balances = get_balances_for_active_materials(db)
+
+    items = []
+    low_stock_count = 0
+    for material in materials:
+        balance = balances.get(material.id, Decimal("0"))
+        is_low = material.min_stock is not None and balance < material.min_stock
+        if is_low:
+            low_stock_count += 1
+        items.append(
+            MaterialStockStatus(material=material, balance=balance, is_low=is_low)
+        )
+
+    return DashboardData(items=items, low_stock_count=low_stock_count)
 
 
 def register_movement(

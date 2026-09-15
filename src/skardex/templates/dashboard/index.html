@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Simple Kardex{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Simple Kardex</h1>
+    <p>Estado actual del inventario</p>
+</hgroup>
+
+{% if low_stock_count > 0 %}
+<p><mark>{{ low_stock_count }} material{{ "es" if low_stock_count != 1 else "" }} bajo el stock mínimo</mark></p>
+{% else %}
+<p>Todos los materiales están sobre su stock mínimo.</p>
+{% endif %}
+
+<table>
+    <thead>
+        <tr>
+            <th>Material</th>
+            <th>Unidad</th>
+            <th>Saldo actual</th>
+            <th>Stock mínimo</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.material.name }}</td>
+            <td>{{ item.material.unit }}</td>
+            <td>{% if item.is_low %}<mark>{{ item.balance }}</mark>{% else %}{{ item.balance }}{% endif %}</td>
+            <td>{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

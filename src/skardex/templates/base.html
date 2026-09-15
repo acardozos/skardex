@@ -8,6 +8,23 @@
     <script src="https://unpkg.com/htmx.org@2" defer></script>
 </head>
 <body>
+{% if request.session.get("user_id") %}
+<nav class="container">
+    <ul>
+        <li><strong>Simple Kardex</strong></li>
+    </ul>
+    <ul>
+        <li><a href="/">Inicio</a></li>
+        <li><a href="/materials">Materiales</a></li>
+        <li><a href="/movements">Movimientos</a></li>
+        <li>
+            <form method="post" action="/logout" style="display:inline;">
+                <button type="submit" class="secondary">Salir</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+{% endif %}
 <main class="container">
     {% block content %}{% endblock %}
 </main>
