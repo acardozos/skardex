@@ -52,6 +52,18 @@ def test_create_user_with_duplicate_username_is_rejected(
     assert response.status_code == 400
 
 
+def test_create_user_with_short_password_is_rejected(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    response = admin_client.post(
+        "/users/new",
+        data={"username": "nuevo-corto", "password": "abc123"},
+    )
+
+    assert response.status_code == 400
+    assert db_session.query(User).filter(User.username == "nuevo-corto").first() is None
+
+
 def test_users_list_does_not_offer_deactivate_for_admin(
     admin_client: TestClient, admin_user: User
 ) -> None:

@@ -3,8 +3,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from skardex.db import get_db
-from skardex.models import User
-from skardex.security import SESSION_ROLE_KEY, SESSION_USER_ID_KEY, verify_password
+from skardex.security import SESSION_ROLE_KEY, SESSION_USER_ID_KEY
+from skardex.services.user_service import authenticate
 from skardex.templating import templates
 
 router = APIRouter()
@@ -24,13 +24,9 @@ def login_submit(
     password: str = Form(...),
     db: Session = Depends(get_db),
 ) -> Response:
-    user = db.query(User).filter(User.username == username).first()
+    user = authenticate(db, username=username, password=password)
 
-    if (
-        user is None
-        or not user.is_active
-        or not verify_password(password, user.password_hash)
-    ):
+    if user is None:
         return templates.TemplateResponse(
             request,
             "auth/login.html",

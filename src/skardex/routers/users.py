@@ -6,8 +6,10 @@ from skardex.db import get_db
 from skardex.models import User
 from skardex.security import require_admin
 from skardex.services.user_service import (
+    MIN_PASSWORD_LENGTH,
     DuplicateUsernameError,
     LastActiveAdminError,
+    WeakPasswordError,
     activate_user,
     create_operario,
     deactivate_user,
@@ -20,6 +22,8 @@ router = APIRouter(prefix="/users")
 def _error_message(exc: Exception) -> str:
     if isinstance(exc, DuplicateUsernameError):
         return "Ya existe un usuario con ese nombre."
+    if isinstance(exc, WeakPasswordError):
+        return f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres."
     return "No se puede desactivar la única cuenta admin activa."
 
 
@@ -58,7 +62,7 @@ def create_user(
 ) -> Response:
     try:
         create_operario(db, username=username, password=password)
-    except DuplicateUsernameError as exc:
+    except (DuplicateUsernameError, WeakPasswordError) as exc:
         return templates.TemplateResponse(
             request,
             "users/form.html",

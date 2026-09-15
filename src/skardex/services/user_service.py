@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 
 from skardex.models import User, UserRole
-from skardex.security import hash_password
+from skardex.security import hash_password, verify_password
+
+MIN_PASSWORD_LENGTH = 8
 
 
 class DuplicateUsernameError(Exception):
@@ -12,8 +14,26 @@ class LastActiveAdminError(Exception):
     """Raised when trying to deactivate the only remaining active admin."""
 
 
+class WeakPasswordError(Exception):
+    """Raised when a password is shorter than MIN_PASSWORD_LENGTH."""
+
+
+def authenticate(db: Session, *, username: str, password: str) -> User | None:
+    user = db.query(User).filter(User.username == username).first()
+    if (
+        user is None
+        or not user.is_active
+        or not verify_password(password, user.password_hash)
+    ):
+        return None
+    return user
+
+
 def create_operario(db: Session, *, username: str, password: str) -> User:
     username = username.strip()
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise WeakPasswordError(MIN_PASSWORD_LENGTH)
+
     if db.query(User).filter(User.username == username).first() is not None:
         raise DuplicateUsernameError(username)
 

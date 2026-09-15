@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     secret_key: str
     seed_admin_username: str
     seed_admin_password: str
+    # Must be True in production (Render serves over HTTPS). Defaults to
+    # False so local dev over http://localhost keeps working out of the box.
+    session_https_only: bool = False
 
 
 settings = Settings()  # type: ignore[call-arg]
