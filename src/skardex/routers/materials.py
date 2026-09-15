@@ -12,6 +12,7 @@ from skardex.services.material_service import (
     DuplicateMaterialCodeError,
     InvalidMinStockError,
     InvalidUnitError,
+    activate_material,
     deactivate_material,
     save_material,
 )
@@ -166,4 +167,15 @@ def deactivate_material_route(
 ) -> Response:
     material = _get_material_or_404(db, material_id)
     deactivate_material(db, material)
+    return RedirectResponse(url="/materials", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{material_id}/activate")
+def activate_material_route(
+    material_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Response:
+    material = _get_material_or_404(db, material_id)
+    activate_material(db, material)
     return RedirectResponse(url="/materials", status_code=status.HTTP_303_SEE_OTHER)

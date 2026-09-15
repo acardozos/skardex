@@ -40,6 +40,10 @@
                 <form method="post" action="/materials/{{ material.id }}/deactivate" style="display:inline;">
                     <button type="submit" class="secondary">Desactivar</button>
                 </form>
+                {% else %}
+                <form method="post" action="/materials/{{ material.id }}/activate" style="display:inline;">
+                    <button type="submit">Activar</button>
+                </form>
                 {% endif %}
             </td>
             {% endif %}

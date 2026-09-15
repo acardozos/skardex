@@ -65,3 +65,8 @@ def save_material(
 def deactivate_material(db: Session, material: Material) -> None:
     material.is_active = False
     db.commit()
+
+
+def activate_material(db: Session, material: Material) -> None:
+    material.is_active = True
+    db.commit()

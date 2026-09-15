@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from skardex.models import Material
+from skardex.models import Material, User
 
 
 def test_list_materials_requires_login(client: TestClient) -> None:
@@ -139,3 +139,52 @@ def test_admin_can_deactivate_material(
     assert response.status_code == 303
     db_session.refresh(material)
     assert material.is_active is False
+
+
+def test_admin_can_reactivate_material(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    admin_client.post(
+        "/materials/new",
+        data={"code": "REA-1", "name": "A reactivar", "unit": "kg", "min_stock": ""},
+    )
+    material = db_session.query(Material).filter(Material.code == "REA-1").first()
+    assert material is not None
+    admin_client.post(f"/materials/{material.id}/deactivate")
+
+    response = admin_client.post(
+        f"/materials/{material.id}/activate", follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    db_session.refresh(material)
+    assert material.is_active is True
+
+
+def test_operario_cannot_reactivate_material(
+    client: TestClient,
+    admin_user: User,
+    operario_user: User,
+    db_session: Session,
+) -> None:
+    # Same TestClient is reused on purpose here (log in/out explicitly)
+    # because admin_client/operario_client fixtures share one session
+    # cookie and can't be combined safely in the same test.
+    client.post(
+        "/login", data={"username": admin_user.username, "password": "admin-pass"}
+    )
+    client.post(
+        "/materials/new",
+        data={"code": "REA-2", "name": "No reactivable", "unit": "kg", "min_stock": ""},
+    )
+    material = db_session.query(Material).filter(Material.code == "REA-2").first()
+    assert material is not None
+    client.post(f"/materials/{material.id}/deactivate")
+    client.post("/logout")
+
+    client.post(
+        "/login", data={"username": operario_user.username, "password": "operario-pass"}
+    )
+    response = client.post(f"/materials/{material.id}/activate")
+
+    assert response.status_code == 403
