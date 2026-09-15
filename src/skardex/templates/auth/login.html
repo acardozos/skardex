@@ -3,24 +3,32 @@
 {% block title %}Iniciar sesión — Simple Kardex{% endblock %}
 
 {% block content %}
-<article style="max-width: 400px; margin: 4rem auto;">
-    <hgroup>
-        <h1>Simple Kardex</h1>
-        <p>Ingresa con tu usuario y contraseña</p>
-    </hgroup>
-    {% if error %}
-    <p style="color: var(--pico-del-color);">{{ error }}</p>
-    {% endif %}
-    <form method="post" action="/login">
-        <label>
-            Usuario
-            <input type="text" name="username" required autofocus>
-        </label>
-        <label>
-            Contraseña
-            <input type="password" name="password" required>
-        </label>
-        <button type="submit">Ingresar</button>
-    </form>
-</article>
+<div class="k-center">
+    <div class="k-auth">
+        <div class="k-auth__head">
+            <p class="k-eyebrow">Control de inventario</p>
+            <h1>Simple Kardex</h1>
+            <p>Ingresa con tu usuario y contraseña.</p>
+        </div>
+
+        <div class="k-formcard">
+            {% if error %}
+            <p class="k-banner">{{ error }}</p>
+            {% endif %}
+            <form class="k-form" method="post" action="/login">
+                <div class="k-field">
+                    <label class="k-label" for="username">Usuario</label>
+                    <input class="k-input" type="text" id="username" name="username" required autofocus>
+                </div>
+                <div class="k-field">
+                    <label class="k-label" for="password">Contraseña</label>
+                    <input class="k-input" type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="k-btn k-btn--primary k-btn--block">Ingresar</button>
+            </form>
+        </div>
+
+        <p class="k-note" style="margin-top:18px">No hay registro público — las cuentas de operario las crea el administrador.</p>
+    </div>
+</div>
 {% endblock %}

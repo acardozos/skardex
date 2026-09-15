@@ -9,6 +9,7 @@ from skardex.models import User, UserRole
 
 SESSION_USER_ID_KEY = "user_id"
 SESSION_ROLE_KEY = "role"
+SESSION_USERNAME_KEY = "username"
 
 
 def hash_password(password: str) -> str:

@@ -1,7 +1,9 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -11,6 +13,8 @@ from skardex.security import NotAuthenticatedError
 from skardex.templating import templates
 
 logger = logging.getLogger("skardex")
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 _ERROR_TEMPLATES = {
     status.HTTP_403_FORBIDDEN: "errors/403.html",
@@ -26,6 +30,7 @@ def create_app() -> FastAPI:
         same_site="lax",
         https_only=settings.session_https_only,
     )
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     app.include_router(auth.router)
     app.include_router(dashboard.router)
     app.include_router(materials.router)

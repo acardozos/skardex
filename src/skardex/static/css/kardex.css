@@ -1,0 +1,199 @@
+/* =============================================================
+   Simple Kardex — hoja de estilos única
+   Basada en AC SciComp Design System (tema oscuro).
+   Sustituye por completo a Pico CSS: elimina el <link> de Pico
+   en base.html antes de usar esta hoja.
+   ============================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#0f1117;
+  --surface:#1a1f2e;
+  --surface2:#222840;
+  --accent:#4f9cf9;
+  --accent2:#7ee8a2;
+  --text:#e2e8f0;
+  --muted:#8892a4;
+  --border:rgba(255,255,255,0.08);
+  --tag-bg:rgba(79,156,249,0.12);
+  --tag-c:#4f9cf9;
+  --tag2-bg:rgba(126,232,162,0.12);
+  --tag2-c:#7ee8a2;
+  --nav-bg:rgba(15,17,23,0.85);
+  --font:'Space Grotesk',system-ui,-apple-system,sans-serif;
+}
+
+/* Tema claro: opt-in con <html data-theme="light">.
+   Sin ese atributo la app queda en oscuro, que es el tema por defecto del
+   design system. Ver README para el conmutador. */
+[data-theme="light"]{
+  --bg:#f8f9fc;
+  --surface:#ffffff;
+  --surface2:#f0f4ff;
+  --accent:#2563eb;
+  --accent2:#0891b2;
+  --text:#1e3a5f;
+  --muted:#64748b;
+  --border:rgba(0,0,0,0.08);
+  --tag-bg:rgba(37,99,235,0.08);
+  --tag-c:#1d4ed8;
+  --tag2-bg:rgba(8,145,178,0.08);
+  --tag2-c:#0369a1;
+  --nav-bg:rgba(248,249,252,0.90);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.7}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent);text-decoration:underline}
+::selection{background:var(--accent);color:#fff}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
+
+/* ---------- Header + navegación ---------- */
+.k-header{position:sticky;top:0;z-index:30;background:var(--nav-bg);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.k-header__inner{max-width:1040px;margin:0 auto;padding:0 20px;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.k-brand{display:flex;align-items:baseline;gap:8px;color:var(--text)}
+.k-brand:hover{text-decoration:none;color:var(--text)}
+.k-brand__name{font-size:16px;font-weight:700;letter-spacing:-0.02em}
+.k-brand__meta{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
+.k-nav{display:flex;align-items:center;gap:4px}
+.k-nav__link{padding:8px 13px;border-radius:8px;font-size:14px;font-weight:500;color:var(--muted)}
+.k-nav__link:hover{color:var(--text);text-decoration:none}
+.k-nav__link.is-active{background:var(--surface2);color:var(--text)}
+.k-session{display:flex;align-items:center;gap:12px}
+.k-session form{margin:0}
+.k-user{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--muted)}
+.k-user__avatar{width:22px;height:22px;border-radius:50%;background:var(--tag-bg);color:var(--tag-c);font-size:11px;font-weight:700;display:grid;place-items:center}
+
+/* menú móvil: <details>, sin JavaScript */
+.k-menu{display:none;position:relative}
+.k-menu__toggle{list-style:none;width:44px;height:44px;display:grid;place-items:center;border:1px solid var(--border);border-radius:8px;background:var(--surface2);cursor:pointer;font-size:18px}
+.k-menu__toggle::-webkit-details-marker{display:none}
+.k-menu__panel{position:absolute;right:0;top:calc(100% + 10px);width:min(280px,calc(100vw - 40px));background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:4px;z-index:40}
+.k-menu__panel a{padding:13px 14px;border-radius:8px;font-size:15px;font-weight:500;color:var(--muted)}
+.k-menu__panel a:hover{color:var(--text);text-decoration:none}
+.k-menu__panel a.is-active{background:var(--surface2);color:var(--text)}
+.k-menu__foot{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--muted)}
+.k-menu__foot form{margin:0}
+.k-menu__foot > span{margin-right:auto}
+
+/* ---------- Estructura de página ---------- */
+.k-main{max-width:1040px;margin:0 auto;padding:32px 20px 72px;display:flex;flex-direction:column;gap:24px}
+.k-page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.k-eyebrow{margin:0;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent)}
+.k-page-head h1{margin:8px 0 6px;font-size:32px;letter-spacing:-0.03em}
+.k-page-head p{margin:0;color:var(--muted);font-size:15px}
+.k-note{margin:0;max-width:560px;font-size:14px;color:var(--muted);line-height:1.7}
+
+/* ---------- Botones ---------- */
+.k-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 18px;border:1px solid transparent;border-radius:10px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .2s ease,transform .15s ease,border-color .2s ease,color .2s ease}
+.k-btn:hover{text-decoration:none}
+.k-btn--primary{background:var(--accent);color:#fff}
+.k-btn--primary:hover{opacity:.88;transform:translateY(-1px);color:#fff}
+.k-btn--ghost{background:transparent;border-color:var(--border);color:var(--text)}
+.k-btn--ghost:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+.k-btn--sm{padding:8px 12px;border-radius:8px;font-size:13px}
+.k-btn--block{width:100%}
+.k-btn--icon{width:38px;height:38px;padding:0;border-radius:8px;font-size:15px;line-height:1;filter:grayscale(0.2)}
+
+/* ---------- Tarjetas y datos ---------- */
+.k-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.k-card__head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border)}
+.k-card__title{font-size:17px}
+.k-card__meta{font-size:13px;color:var(--muted)}
+
+.k-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px}
+.k-kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column}
+.k-kpi__value{font-size:36px;font-weight:700;line-height:1}
+.k-kpi__value--alert{color:var(--accent)}
+.k-kpi__label{font-size:12px;color:var(--muted);margin-top:6px}
+
+.k-alert{background:var(--surface);border:1px solid var(--accent);border-radius:14px;padding:22px 24px}
+.k-alert__head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+.k-alert__icon{font-size:18px;filter:grayscale(0.2)}
+.k-alert__text{margin:4px 0 0;font-size:15px;font-weight:500}
+.k-chips{display:flex;flex-wrap:wrap;gap:10px}
+.k-chip{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:14px;font-weight:500}
+.k-chip span{font-size:13px;font-weight:400;color:var(--muted)}
+.k-ok{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 22px;display:flex;align-items:center;gap:12px;font-size:15px}
+.k-dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);flex:none}
+
+.k-tag{display:inline-block;font-size:12px;font-weight:700;letter-spacing:0.02em;padding:4px 12px;border-radius:20px;background:var(--tag-bg);color:var(--tag-c)}
+.k-tag--ok{background:var(--tag2-bg);color:var(--tag2-c)}
+.k-tag--muted{background:var(--border);color:var(--muted)}
+
+/* ---------- Tablas ---------- */
+.k-table{width:100%;border-collapse:collapse}
+.k-table th{padding:12px 20px;background:var(--bg);border-bottom:1px solid var(--border);text-align:left;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
+.k-table td{padding:14px 20px;border-bottom:1px solid var(--border);font-size:15px;vertical-align:middle}
+.k-table tr:last-child td{border-bottom:none}
+.k-table .k-num{text-align:right;font-variant-numeric:tabular-nums}
+.k-table .k-strong{font-weight:500}
+.k-table .k-dim{color:var(--muted);font-size:14px}
+.k-table .k-low{color:var(--accent);font-weight:700}
+.k-actions{display:flex;gap:8px;justify-content:flex-end}
+.k-actions form{margin:0}
+
+@media (max-width:880px){
+  .k-nav,.k-session{display:none}
+  .k-menu{display:block}
+  .k-table thead{display:none}
+  .k-table tr{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .k-table td{display:block;padding:0;border:none;text-align:left}
+  .k-table td::before{content:attr(data-label);display:block;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .k-table td.k-num{text-align:left}
+  .k-table td.k-cell--wide{grid-column:1 / -1}
+  .k-actions{justify-content:flex-start}
+  .k-page-head h1{font-size:27px}
+}
+
+/* ---------- Barra de filtros ---------- */
+.k-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.k-toolbar form{display:contents}
+.k-toolbar .k-input,.k-toolbar .k-select{flex:1 1 220px;min-width:0;background:var(--surface)}
+.k-seg{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px}
+.k-seg a{padding:8px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--muted)}
+.k-seg a:hover{color:var(--text);text-decoration:none}
+.k-seg a.is-active{background:var(--surface2);color:var(--text)}
+
+/* ---------- Formularios ---------- */
+.k-formcard{width:100%;max-width:480px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px}
+.k-form{display:flex;flex-direction:column;gap:16px}
+.k-form__row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+.k-field{display:flex;flex-direction:column;gap:7px}
+.k-label{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
+.k-input,.k-select,.k-textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font:inherit;font-size:15px}
+.k-textarea{resize:vertical;min-height:72px}
+.k-input:focus,.k-select:focus,.k-textarea:focus{outline:none;border-color:var(--accent)}
+.k-help{font-size:13px;color:var(--muted)}
+.k-error{font-size:13px;color:var(--accent)}
+.k-field--error .k-input,.k-field--error .k-select{border-color:var(--accent)}
+.k-form__actions{display:flex;gap:10px;margin-top:6px}
+/* Selector de tipo de movimiento: radios reales con apariencia de botón.
+   El estado seleccionado lo pinta :checked — no uses estilos inline. */
+.k-radio{display:block}
+.k-radio input{position:absolute;opacity:0;width:0;height:0}
+.k-radio input:checked + .k-btn{border-color:var(--accent);color:var(--text);background:var(--surface2)}
+.k-radio input:focus-visible + .k-btn{outline:2px solid var(--accent);outline-offset:2px}
+.k-form__actions form{margin:0}
+.k-banner{margin:0 0 18px;background:var(--bg);border:1px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:14px;color:var(--text)}
+.k-hint{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+.k-readonly{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:13px;color:var(--muted)}
+.k-readonly .k-dot{background:var(--muted)}
+
+/* ---------- Estados vacíos y páginas de error ---------- */
+.k-empty{padding:48px 24px;text-align:center}
+.k-empty__icon{font-size:26px;filter:grayscale(0.2)}
+.k-empty h3{margin:12px 0 4px;font-size:16px}
+.k-empty p{margin:0 auto 18px;max-width:380px;font-size:14px;color:var(--muted);line-height:1.6}
+.k-center{min-height:100vh;display:grid;place-items:center;padding:32px 20px}
+.k-auth{width:100%;max-width:380px}
+.k-auth__head{display:flex;flex-direction:column;gap:4px;margin-bottom:24px}
+.k-auth__head h1{font-size:30px;letter-spacing:-0.03em}
+.k-auth__head p{margin:0;color:var(--muted);font-size:15px}
+.k-errorpage{max-width:520px;margin:0 auto;text-align:center;padding:12vh 0}
+.k-errorpage__code{font-size:64px;font-weight:700;letter-spacing:-0.03em;line-height:1;color:var(--accent)}
+.k-errorpage h1{margin:14px 0 8px;font-size:24px}
+.k-errorpage p{margin:0 0 26px;color:var(--muted);font-size:15px}

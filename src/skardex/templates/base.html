@@ -4,32 +4,69 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Simple Kardex{% endblock %}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem('kardex-theme') || '';
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/kardex.css') }}">
     <script src="https://unpkg.com/htmx.org@2" defer></script>
 </head>
 <body>
 {% if request.session.get("user_id") %}
-<nav class="container">
-    <ul>
-        <li><strong>Simple Kardex</strong></li>
-    </ul>
-    <ul>
-        <li><a href="/">Inicio</a></li>
-        <li><a href="/materials">Materiales</a></li>
-        <li><a href="/movements">Movimientos</a></li>
-        {% if request.session.get("role") == "admin" %}
-        <li><a href="/users">Usuarios</a></li>
-        {% endif %}
-        <li>
-            <form method="post" action="/logout" style="display:inline;">
-                <button type="submit" class="secondary">Salir</button>
+<header class="k-header">
+    <div class="k-header__inner">
+        <a class="k-brand" href="/">
+            <span class="k-brand__name">Simple Kardex</span>
+            <span class="k-brand__meta">Zona 58</span>
+        </a>
+
+        <nav class="k-nav">
+            <a class="k-nav__link{% if request.url.path == '/' %} is-active{% endif %}" href="/">Inicio</a>
+            <a class="k-nav__link{% if request.url.path.startswith('/materials') %} is-active{% endif %}" href="/materials">Materiales</a>
+            <a class="k-nav__link{% if request.url.path.startswith('/movements') %} is-active{% endif %}" href="/movements">Movimientos</a>
+            {% if request.session.get("role") == "admin" %}
+            <a class="k-nav__link{% if request.url.path.startswith('/users') %} is-active{% endif %}" href="/users">Usuarios</a>
+            {% endif %}
+        </nav>
+
+        <div class="k-session">
+            <span class="k-user">
+                <span class="k-user__avatar">{{ request.session.get("username", "")[:2].upper() }}</span>{{ request.session.get("username") }} · {{ "Admin" if request.session.get("role") == "admin" else "Operario" }}
+            </span>
+            <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+            <!-- Espacio reservado para el enlace de cuenta/cambiar contraseña (spec 003) -->
+            <form method="post" action="/logout">
+                <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Salir</button>
             </form>
-        </li>
-    </ul>
-</nav>
+        </div>
+
+        <details class="k-menu">
+            <summary class="k-menu__toggle" aria-label="Abrir menú">☰</summary>
+            <div class="k-menu__panel">
+                <a class="{% if request.url.path == '/' %}is-active{% endif %}" href="/">Inicio</a>
+                <a class="{% if request.url.path.startswith('/materials') %}is-active{% endif %}" href="/materials">Materiales</a>
+                <a class="{% if request.url.path.startswith('/movements') %}is-active{% endif %}" href="/movements">Movimientos</a>
+                {% if request.session.get("role") == "admin" %}
+                <a class="{% if request.url.path.startswith('/users') %}is-active{% endif %}" href="/users">Usuarios</a>
+                {% endif %}
+                <div class="k-menu__foot">
+                    <span>{{ request.session.get("username") }} · {{ "Admin" if request.session.get("role") == "admin" else "Operario" }}</span>
+                    <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+                    <form method="post" action="/logout">
+                        <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Salir</button>
+                    </form>
+                </div>
+            </div>
+        </details>
+    </div>
+</header>
 {% endif %}
-<main class="container">
-    {% block content %}{% endblock %}
-</main>
+{% block content %}{% endblock %}
+<script>
+  const kardexTheme = () => {
+    const claro = document.documentElement.dataset.theme === 'light';
+    document.documentElement.dataset.theme = claro ? '' : 'light';
+    localStorage.setItem('kardex-theme', claro ? '' : 'light');
+  };
+</script>
 </body>
 </html>

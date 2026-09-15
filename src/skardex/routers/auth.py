@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from skardex.db import get_db
-from skardex.security import SESSION_ROLE_KEY, SESSION_USER_ID_KEY
+from skardex.security import SESSION_ROLE_KEY, SESSION_USER_ID_KEY, SESSION_USERNAME_KEY
 from skardex.services.user_service import authenticate
 from skardex.templating import templates
 
@@ -36,6 +36,7 @@ def login_submit(
 
     request.session[SESSION_USER_ID_KEY] = user.id
     request.session[SESSION_ROLE_KEY] = user.role.value
+    request.session[SESSION_USERNAME_KEY] = user.username
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 
