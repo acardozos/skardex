@@ -19,6 +19,8 @@ class MaterialStockStatus:
 class DashboardData:
     items: list[MaterialStockStatus]
     low_stock_count: int
+    active_materials_count: int
+    movements_month_count: int
 
 
 class InvalidQuantityError(Exception):
@@ -64,6 +66,17 @@ def get_balances_for_active_materials(db: Session) -> dict[int, Decimal]:
     return {material_id: Decimal(str(total)) for material_id, total in rows}
 
 
+def _current_month_range() -> tuple[date, date]:
+    """Return (first day of the current month, first day of the next one)."""
+    today = date.today()
+    start = today.replace(day=1)
+    if today.month == 12:
+        end = today.replace(year=today.year + 1, month=1, day=1)
+    else:
+        end = today.replace(month=today.month + 1, day=1)
+    return start, end
+
+
 def get_dashboard_data(db: Session) -> DashboardData:
     materials = (
         db.query(Material)
@@ -84,7 +97,21 @@ def get_dashboard_data(db: Session) -> DashboardData:
             MaterialStockStatus(material=material, balance=balance, is_low=is_low)
         )
 
-    return DashboardData(items=items, low_stock_count=low_stock_count)
+    month_start, month_end = _current_month_range()
+    movements_month_count = (
+        db.query(Movement)
+        .filter(
+            Movement.movement_date >= month_start, Movement.movement_date < month_end
+        )
+        .count()
+    )
+
+    return DashboardData(
+        items=items,
+        low_stock_count=low_stock_count,
+        active_materials_count=len(items),
+        movements_month_count=movements_month_count,
+    )
 
 
 def register_movement(

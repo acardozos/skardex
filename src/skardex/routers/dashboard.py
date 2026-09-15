@@ -19,5 +19,11 @@ def dashboard(
     return templates.TemplateResponse(
         request,
         "dashboard/index.html",
-        {"items": data.items, "low_stock_count": data.low_stock_count},
+        {
+            "user": user,
+            "items": data.items,
+            "low_stock_count": data.low_stock_count,
+            "active_materials_count": data.active_materials_count,
+            "movements_month_count": data.movements_month_count,
+        },
     )

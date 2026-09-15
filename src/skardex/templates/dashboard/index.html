@@ -3,35 +3,92 @@
 {% block title %}Simple Kardex{% endblock %}
 
 {% block content %}
-<hgroup>
-    <h1>Simple Kardex</h1>
-    <p>Estado actual del inventario</p>
-</hgroup>
+<main class="k-main">
+    <div class="k-page-head">
+        <div>
+            <p class="k-eyebrow">Estado del inventario</p>
+            <h1>Inicio</h1>
+            {% if user.role == "admin" %}
+            <p>Saldos calculados a partir de las entradas y salidas registradas.</p>
+            {% else %}
+            <p>Consulta los saldos y registra las entradas y salidas del día.</p>
+            {% endif %}
+        </div>
+        {% if user.role != "admin" %}
+        <a class="k-btn k-btn--primary" href="/movements/new">Registrar movimiento</a>
+        {% endif %}
+    </div>
 
-{% if low_stock_count > 0 %}
-<p><mark>{{ low_stock_count }} material{{ "es" if low_stock_count != 1 else "" }} bajo el stock mínimo</mark></p>
-{% else %}
-<p>Todos los materiales están sobre su stock mínimo.</p>
-{% endif %}
+    <div class="k-kpis">
+        <div class="k-kpi">
+            <span class="k-kpi__value">{{ active_materials_count }}</span>
+            <span class="k-kpi__label">Materiales activos</span>
+        </div>
+        <div class="k-kpi">
+            <span class="k-kpi__value k-kpi__value--alert">{{ low_stock_count }}</span>
+            <span class="k-kpi__label">Bajo stock mínimo</span>
+        </div>
+        <div class="k-kpi">
+            <span class="k-kpi__value">{{ movements_month_count }}</span>
+            <span class="k-kpi__label">Movimientos este mes</span>
+        </div>
+    </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>Material</th>
-            <th>Unidad</th>
-            <th>Saldo actual</th>
-            <th>Stock mínimo</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for item in items %}
-        <tr>
-            <td>{{ item.material.name }}</td>
-            <td>{{ item.material.unit }}</td>
-            <td>{% if item.is_low %}<mark>{{ item.balance }}</mark>{% else %}{{ item.balance }}{% endif %}</td>
-            <td>{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    {% if low_stock_count > 0 %}
+    <div class="k-alert">
+        <div class="k-alert__head">
+            <span class="k-alert__icon">⚠️</span>
+            <div>
+                <p class="k-eyebrow">Atención</p>
+                <p class="k-alert__text">{{ low_stock_count }} material{{ "es" if low_stock_count != 1 else "" }} {{ "están" if low_stock_count != 1 else "está" }} por debajo de su stock mínimo.</p>
+            </div>
+        </div>
+        <div class="k-chips">
+            {% for item in items if item.is_low %}
+            <div class="k-chip">{{ item.material.name }} <span>{{ item.balance }} de {{ item.material.min_stock }} {{ item.material.unit }}</span></div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="k-ok"><span class="k-dot"></span> Todos los materiales están sobre su stock mínimo.</div>
+    {% endif %}
+
+    <div class="k-card">
+        <div class="k-card__head">
+            <h2 class="k-card__title">Saldos por material</h2>
+            <span class="k-card__meta">{{ active_materials_count }} material{{ "es" if active_materials_count != 1 else "" }} activo{{ "s" if active_materials_count != 1 else "" }}</span>
+        </div>
+        <table class="k-table">
+            <thead>
+                <tr>
+                    <th>Material</th>
+                    <th>Unidad</th>
+                    <th class="k-num">Saldo actual</th>
+                    <th class="k-num">Stock mínimo</th>
+                    <th class="k-num">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td data-label="Material" class="k-strong">{{ item.material.name }}</td>
+                    <td data-label="Unidad" class="k-dim">{{ item.material.unit }}</td>
+                    <td data-label="Saldo actual" class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance }}</td>
+                    <td data-label="Stock mínimo" class="k-num k-dim">{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
+                    <td data-label="Estado" class="k-num"><span class="k-tag{{ '' if item.is_low else ' k-tag--ok' }}">{{ "Bajo mínimo" if item.is_low else "En orden" }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if not items %}
+        <div class="k-empty">
+            <span class="k-empty__icon">📦</span>
+            <h3>Aún no hay materiales</h3>
+            <p>Crea tu primer material en el catálogo y los saldos aparecerán aquí.</p>
+            <a class="k-btn k-btn--primary" href="/materials">Ir a materiales</a>
+        </div>
+        {% endif %}
+    </div>
+</main>
 {% endblock %}

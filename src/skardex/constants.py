@@ -21,3 +21,28 @@ UNITS = [
     "docena",
     "botella",
 ]
+
+# Human-readable label per unit code, for display only (the stored/posted
+# value is always the code in UNITS). Falls back to the code itself if a
+# unit is ever added here without a label.
+UNIT_LABELS: dict[str, str] = {
+    "kg": "kg",
+    "g": "g",
+    "mg": "mg",
+    "lb": "lb",
+    "oz": "oz",
+    "lt": "litro",
+    "ml": "ml",
+    "m3": "m³",
+    "gl": "galón",
+    "m": "m",
+    "m2": "m²",
+    "pulg": "pulgada",
+    "pie": "pie",
+    "unidad": "unidad",
+    "caja": "caja",
+    "rollo": "rollo",
+    "saco": "saco",
+    "docena": "docena",
+    "botella": "botella",
+}
