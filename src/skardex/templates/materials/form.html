@@ -13,7 +13,7 @@
     <form method="post" action="{% if material %}/materials/{{ material.id }}/edit{% else %}/materials/new{% endif %}">
         <label>
             Código (opcional)
-            <input type="text" name="code" value="{{ material.code if material else '' }}">
+            <input type="text" name="code" value="{{ (material.code or '') if material else '' }}">
         </label>
         <label>
             Nombre

@@ -97,6 +97,31 @@ def test_create_material_with_negative_min_stock_is_rejected(
     assert response.status_code == 400
 
 
+def test_edit_form_and_resave_do_not_turn_empty_code_into_literal_none(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    admin_client.post(
+        "/materials/new",
+        data={"code": "", "name": "Sin codigo", "unit": "kg", "min_stock": ""},
+    )
+    material = db_session.query(Material).filter(Material.name == "Sin codigo").first()
+    assert material is not None
+    assert material.code is None
+
+    edit_form = admin_client.get(f"/materials/{material.id}/edit")
+    assert "None" not in edit_form.text
+
+    response = admin_client.post(
+        f"/materials/{material.id}/edit",
+        data={"code": "", "name": "Sin codigo", "unit": "kg", "min_stock": ""},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    db_session.refresh(material)
+    assert material.code is None
+
+
 def test_admin_can_edit_material(admin_client: TestClient, db_session: Session) -> None:
     admin_client.post(
         "/materials/new",
