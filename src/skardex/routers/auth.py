@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from skardex.db import get_db
 from skardex.models import User
-from skardex.security import SESSION_USER_ID_KEY, verify_password
+from skardex.security import SESSION_ROLE_KEY, SESSION_USER_ID_KEY, verify_password
 from skardex.templating import templates
 
 router = APIRouter()
@@ -39,6 +39,7 @@ def login_submit(
         )
 
     request.session[SESSION_USER_ID_KEY] = user.id
+    request.session[SESSION_ROLE_KEY] = user.role.value
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 

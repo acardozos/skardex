@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios — Simple Kardex{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Usuarios</h1>
+    <p>Cuentas con acceso a Simple Kardex</p>
+</hgroup>
+
+{% if error %}
+<p style="color: var(--pico-del-color);">{{ error }}</p>
+{% endif %}
+
+<p><a href="/users/new" role="button">Nuevo operario</a></p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Usuario</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ "Admin" if u.role == "admin" else "Operario" }}</td>
+            <td>{{ "Activo" if u.is_active else "Inactivo" }}</td>
+            <td>
+                {% if u.role == "admin" %}
+                -
+                {% elif u.is_active %}
+                <form method="post" action="/users/{{ u.id }}/deactivate" style="display:inline;">
+                    <button type="submit" class="secondary">Desactivar</button>
+                </form>
+                {% else %}
+                <form method="post" action="/users/{{ u.id }}/activate" style="display:inline;">
+                    <button type="submit">Activar</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

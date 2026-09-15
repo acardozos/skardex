@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo operario — Simple Kardex{% endblock %}
+
+{% block content %}
+<article style="max-width: 400px; margin: 2rem auto;">
+    <h1>Nuevo operario</h1>
+
+    {% if error %}
+    <p style="color: var(--pico-del-color);">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" action="/users/new">
+        <label>
+            Usuario
+            <input type="text" name="username" required autofocus>
+        </label>
+        <label>
+            Contraseña inicial
+            <input type="password" name="password" required>
+        </label>
+        <button type="submit">Crear</button>
+        <a href="/users" role="button" class="secondary">Cancelar</a>
+    </form>
+</article>
+{% endblock %}

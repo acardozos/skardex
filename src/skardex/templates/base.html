@@ -17,6 +17,9 @@
         <li><a href="/">Inicio</a></li>
         <li><a href="/materials">Materiales</a></li>
         <li><a href="/movements">Movimientos</a></li>
+        {% if request.session.get("role") == "admin" %}
+        <li><a href="/users">Usuarios</a></li>
+        {% endif %}
         <li>
             <form method="post" action="/logout" style="display:inline;">
                 <button type="submit" class="secondary">Salir</button>
