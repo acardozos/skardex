@@ -3,9 +3,12 @@
 {% block title %}Página no encontrada — Simple Kardex{% endblock %}
 
 {% block content %}
-<article style="max-width: 500px; margin: 4rem auto; text-align: center;">
-    <h1>404</h1>
-    <p>La página que buscas no existe.</p>
-    <a href="/" role="button">Volver al inicio</a>
-</article>
+<main class="k-main">
+    <div class="k-errorpage">
+        <div class="k-errorpage__code">404</div>
+        <h1>Página no encontrada</h1>
+        <p>La dirección que abriste no existe o el registro fue desactivado.</p>
+        <a class="k-btn k-btn--primary" href="/">Volver al inicio</a>
+    </div>
+</main>
 {% endblock %}

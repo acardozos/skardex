@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Acceso denegado — Simple Kardex{% endblock %}
+{% block title %}No tienes acceso a esta página — Simple Kardex{% endblock %}
 
 {% block content %}
-<article style="max-width: 500px; margin: 4rem auto; text-align: center;">
-    <h1>403</h1>
-    <p>No tienes permiso para acceder a esta página.</p>
-    <a href="/" role="button">Volver al inicio</a>
-</article>
+<main class="k-main">
+    <div class="k-errorpage">
+        <div class="k-errorpage__code">403</div>
+        <h1>No tienes acceso a esta página</h1>
+        <p>Esta sección es solo para el administrador. Si crees que es un error, pídele acceso al dueño.</p>
+        <a class="k-btn k-btn--primary" href="/">Volver al inicio</a>
+    </div>
+</main>
 {% endblock %}

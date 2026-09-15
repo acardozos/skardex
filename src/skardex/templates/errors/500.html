@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 
-{% block title %}Error inesperado — Simple Kardex{% endblock %}
+{% block title %}Algo falló de nuestro lado — Simple Kardex{% endblock %}
 
 {% block content %}
-<article style="max-width: 500px; margin: 4rem auto; text-align: center;">
-    <h1>Ups, algo salió mal</h1>
-    <p>Ocurrió un error inesperado. Intenta de nuevo en un momento.</p>
-    <a href="/" role="button">Volver al inicio</a>
-</article>
+<main class="k-main">
+    <div class="k-errorpage">
+        <div class="k-errorpage__code">500</div>
+        <h1>Algo falló de nuestro lado</h1>
+        <p>Vuelve a intentarlo en un momento. Si sigue pasando, avisa al administrador.</p>
+        <a class="k-btn k-btn--primary" href="/">Volver al inicio</a>
+    </div>
+</main>
 {% endblock %}
