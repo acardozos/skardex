@@ -1,8 +1,8 @@
 # Simple Kardex
 
-Webapp simple de control de materiales e insumos (kardex) para un negocio
-familiar — reemplaza una hoja de cálculo con un registro de entradas y
-salidas, saldos calculados y alertas de stock mínimo.
+A simple materials/supplies inventory tracker (kardex) for a family
+business — replaces a spreadsheet with an entries/exits ledger,
+calculated balances, and low-stock alerts.
 
 [![CI](https://github.com/acardozos/skardex/actions/workflows/ci.yml/badge.svg)](https://github.com/acardozos/skardex/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/github/license/acardozos/skardex)](LICENSE)
@@ -10,48 +10,48 @@ salidas, saldos calculados y alertas de stock mínimo.
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-## Qué hace
+## What it does
 
-- Catálogo de materiales con código, unidad de medida y stock mínimo.
-- Registro de movimientos (entradas/salidas) con saldo calculado a partir
-  del historial, nunca almacenado como columna aparte.
-- Dashboard con contadores y alerta visual de materiales bajo su stock
-  mínimo.
-- Dos roles: **admin** (dueño, gestiona materiales y usuarios) y
-  **operario** (solo registra movimientos y consulta el catálogo).
-- Sin registro público — las cuentas las crea el admin.
-- Tema oscuro/claro conmutable.
+- Materials catalog with code, unit of measure, and minimum stock.
+- Movement log (entries/exits) with balance calculated from history,
+  never stored as a separate column.
+- Dashboard with counters and a visual alert for materials below their
+  minimum stock.
+- Two roles: **admin** (owner, manages materials and users) and
+  **operario** (registers movements and reads the catalog only).
+- No public sign-up — the admin creates accounts.
+- Switchable dark/light theme.
 
 ## Stack
 
 - **Backend**: [FastAPI](https://fastapi.tiangolo.com/), server-rendered
-  con [Jinja2](https://jinja.palletsprojects.com/) (sin frontend build).
-- **Base de datos**: PostgreSQL vía [SQLAlchemy](https://www.sqlalchemy.org/)
-  2.x + [Alembic](https://alembic.sqlalchemy.org/) para migraciones.
-- **Auth**: sesiones propias con cookie firmada
+  with [Jinja2](https://jinja.palletsprojects.com/) (no frontend build).
+- **Database**: PostgreSQL via [SQLAlchemy](https://www.sqlalchemy.org/)
+  2.x + [Alembic](https://alembic.sqlalchemy.org/) for migrations.
+- **Auth**: custom session-based auth with a signed cookie
   (`starlette.middleware.sessions`) + `bcrypt`.
-- **Gestor de paquetes**: [uv](https://github.com/astral-sh/uv).
-- **Calidad**: [Ruff](https://github.com/astral-sh/ruff) (lint + format),
-  [mypy](https://mypy-lang.org/) en modo estricto, `pytest`, `pre-commit`.
+- **Package manager**: [uv](https://github.com/astral-sh/uv).
+- **Quality**: [Ruff](https://github.com/astral-sh/ruff) (lint + format),
+  [mypy](https://mypy-lang.org/) in strict mode, `pytest`, `pre-commit`.
 
-## Desarrollo local
+## Local development
 
-Requiere [uv](https://docs.astral.sh/uv/getting-started/installation/) y
-Python 3.11+ (uv puede instalarlo por ti).
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/)
+and Python 3.11+ (uv can install it for you).
 
 ```bash
 git clone git@github.com:acardozos/skardex.git
 cd skardex
 uv sync
-cp .env.example .env  # completa DATABASE_URL, SECRET_KEY, etc.
+cp .env.example .env  # fill in DATABASE_URL, SECRET_KEY, etc.
 uv run alembic upgrade head
-uv run python -m skardex.seed_admin  # crea el usuario admin inicial
+uv run python -m skardex.seed_admin  # creates the initial admin user
 uv run uvicorn skardex.main:app --reload
 ```
 
-La app queda en `http://127.0.0.1:8000`.
+The app is now at `http://127.0.0.1:8000`.
 
-### Tests y calidad
+### Tests and quality
 
 ```bash
 uv run pytest
@@ -60,39 +60,40 @@ uv run ruff format --check .
 uv run mypy src tests
 ```
 
-Los tests usan SQLite en memoria — no requieren una base de datos real.
+Tests run against an in-memory SQLite database — no real database
+required.
 
-### Hooks de pre-commit (opcional)
+### Pre-commit hooks (optional)
 
 ```bash
 uv run pre-commit install
 ```
 
-## Estructura del proyecto
+## Project structure
 
 ```
 src/skardex/
-├── main.py           # app factory, middleware, manejadores de error
-├── config.py         # configuración vía variables de entorno
-├── db.py             # engine/sesión de SQLAlchemy
-├── security.py       # hashing, dependencias de sesión/roles
-├── constants.py       # unidades de medida
-├── models/           # entidades SQLAlchemy
-├── routers/          # rutas HTTP por área (auth, materials, movements, users, dashboard)
-├── services/         # lógica de negocio (routers no la contienen)
+├── main.py           # app factory, middleware, error handlers
+├── config.py         # settings from environment variables
+├── db.py             # SQLAlchemy engine/session
+├── security.py       # password hashing, session/role dependencies
+├── constants.py       # units of measure
+├── models/           # SQLAlchemy entities
+├── routers/          # HTTP routes per area (auth, materials, movements, users, dashboard)
+├── services/         # business logic (kept out of routers)
 ├── templates/        # Jinja2
-└── static/           # CSS propio
-tests/                # pytest, un archivo por área
-alembic/              # migraciones de base de datos
+└── static/           # own CSS
+tests/                # pytest, one file per area
+alembic/              # database migrations
 ```
 
-## Despliegue
+## Deployment
 
-Desplegado con Docker en [Render](https://render.com/), base de datos en
-[Supabase](https://supabase.com/) (Postgres gestionado), DNS en
-[Cloudflare](https://www.cloudflare.com/). Ver `Dockerfile` para el
-proceso de build/arranque.
+Deployed with Docker on [Render](https://render.com/), database on
+[Supabase](https://supabase.com/) (managed Postgres), DNS on
+[Cloudflare](https://www.cloudflare.com/). See `Dockerfile` for the
+build/startup process.
 
-## Licencia
+## License
 
-[MIT](LICENSE) — ver el archivo `LICENSE` para el texto completo.
+[MIT](LICENSE) — see the `LICENSE` file for the full text.
