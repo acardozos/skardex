@@ -11,6 +11,7 @@ dependencies = [
     "alembic>=1.20.0",
     "bcrypt>=5.0.0",
     "fastapi>=0.141.1",
+    "itsdangerous>=2.2.0",
     "jinja2>=3.1.6",
     "psycopg[binary]>=3.3.5",
     "pydantic-settings>=2.15.0",
@@ -28,7 +29,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
+    "httpx2>=2.13.0",
     "mypy>=2.3.1",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
@@ -41,6 +42,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI usa Depends(...)/Query(...)/etc. como default de argumento a propósito.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
 
 [tool.mypy]
 python_version = "3.11"

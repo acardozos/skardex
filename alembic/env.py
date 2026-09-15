@@ -10,8 +10,8 @@ from skardex.models import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-# La URL de conexión viene de nuestra configuración (.env / entorno),
-# no de alembic.ini, para no duplicar el secreto en dos lugares.
+# The connection URL comes from our own settings (.env / environment),
+# not from alembic.ini, to avoid duplicating the secret in two places.
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging.
