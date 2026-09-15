@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from skardex.db import get_db
 from skardex.main import app
-from skardex.models import Base, User, UserRole
+from skardex.models import Base, Material, User, UserRole
 from skardex.security import hash_password
 
 
@@ -95,3 +96,12 @@ def operario_client(client: TestClient, operario_user: User) -> TestClient:
         "/login", data={"username": operario_user.username, "password": "operario-pass"}
     )
     return client
+
+
+@pytest.fixture
+def material(db_session: Session) -> Material:
+    material = Material(code="MAT-1", name="Cemento", unit="kg", min_stock=Decimal("5"))
+    db_session.add(material)
+    db_session.commit()
+    db_session.refresh(material)
+    return material

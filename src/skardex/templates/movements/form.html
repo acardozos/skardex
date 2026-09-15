@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar movimiento — Simple Kardex{% endblock %}
+
+{% block content %}
+<article style="max-width: 500px; margin: 2rem auto;">
+    <h1>Registrar movimiento</h1>
+
+    {% if error %}
+    <p style="color: var(--pico-del-color);">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" action="/movements/new">
+        <label>
+            Material
+            <select name="material_id" required>
+                <option value="" disabled selected>Selecciona un material</option>
+                {% for material in materials %}
+                <option value="{{ material.id }}">{{ material.name }} ({{ material.unit }})</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Tipo de movimiento
+            <select name="movement_type" required>
+                <option value="entrada">Entrada</option>
+                <option value="salida">Salida</option>
+            </select>
+        </label>
+        <label>
+            Cantidad
+            <input type="number" step="0.001" min="0" name="quantity" required>
+        </label>
+        <label>
+            Fecha
+            <input type="date" name="movement_date" value="{{ today }}" required>
+        </label>
+        <label>
+            Observación (opcional)
+            <textarea name="note"></textarea>
+        </label>
+        <button type="submit">Guardar</button>
+        <a href="/movements" role="button" class="secondary">Cancelar</a>
+    </form>
+</article>
+{% endblock %}

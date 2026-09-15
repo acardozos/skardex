@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Movimientos — Simple Kardex{% endblock %}
+
+{% block content %}
+<hgroup>
+    <h1>Movimientos</h1>
+    <p>Historial de entradas y salidas</p>
+</hgroup>
+
+<p><a href="/movements/new" role="button">Registrar movimiento</a></p>
+
+<form method="get" action="/movements">
+    <label>
+        Filtrar por material
+        <select name="material_id" onchange="this.form.submit()">
+            <option value="">Todos</option>
+            {% for material in materials %}
+            <option value="{{ material.id }}" {% if selected_material_id == material.id %}selected{% endif %}>{{ material.name }}</option>
+            {% endfor %}
+        </select>
+    </label>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Material</th>
+            <th>Tipo</th>
+            <th>Cantidad</th>
+            <th>Usuario</th>
+            <th>Observación</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for movement in movements %}
+        <tr>
+            <td>{{ movement.movement_date }}</td>
+            <td>{{ movement.material.name }}</td>
+            <td>{{ "Entrada" if movement.type == "entrada" else "Salida" }}</td>
+            <td>{{ movement.quantity }}</td>
+            <td>{{ movement.user.username }}</td>
+            <td>{{ movement.note or "-" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
