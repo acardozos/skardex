@@ -1,7 +1,7 @@
 from datetime import date as date_type
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, Form, Request, Response, status
+from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from skardex.services.kardex_service import (
     InactiveMaterialError,
     InsufficientStockError,
     InvalidQuantityError,
+    get_balances_for_active_materials,
     register_movement,
 )
 from skardex.templating import templates
@@ -29,6 +30,9 @@ def _error_message(exc: Exception) -> str:
     return "La fecha ingresada no es válida."
 
 
+_VALID_TYPES = {"entrada", "salida"}
+
+
 def _active_materials(db: Session) -> list[Material]:
     return (
         db.query(Material)
@@ -44,6 +48,7 @@ def list_movements(
     user: CurrentUser,
     db: Session = Depends(get_db),
     material_id: str = "",
+    type_filter: str = Query("", alias="type"),
 ) -> Response:
     # Query param arrives as "" for the "Todos" option in the filter
     # <select>, which FastAPI can't coerce directly into int | None.
@@ -52,11 +57,15 @@ def list_movements(
     except ValueError:
         selected_material_id = None
 
+    selected_type = type_filter if type_filter in _VALID_TYPES else ""
+
     query = db.query(Movement).order_by(
         Movement.movement_date.desc(), Movement.id.desc()
     )
     if selected_material_id is not None:
         query = query.filter(Movement.material_id == selected_material_id)
+    if selected_type:
+        query = query.filter(Movement.type == MovementType(selected_type))
 
     return templates.TemplateResponse(
         request,
@@ -65,6 +74,7 @@ def list_movements(
             "movements": query.all(),
             "materials": db.query(Material).order_by(Material.name).all(),
             "selected_material_id": selected_material_id,
+            "selected_type": selected_type,
         },
     )
 
@@ -75,11 +85,13 @@ def new_movement_form(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> Response:
+    materials = _active_materials(db)
     return templates.TemplateResponse(
         request,
         "movements/form.html",
         {
-            "materials": _active_materials(db),
+            "materials": materials,
+            "balances": get_balances_for_active_materials(db),
             "error": None,
             "today": date_type.today().isoformat(),
         },
@@ -124,6 +136,7 @@ def create_movement(
             "movements/form.html",
             {
                 "materials": _active_materials(db),
+                "balances": get_balances_for_active_materials(db),
                 "error": _error_message(exc),
                 "today": date_type.today().isoformat(),
             },

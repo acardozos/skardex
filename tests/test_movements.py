@@ -151,3 +151,98 @@ def test_filter_movements_by_material(
     assert response.status_code == 200
     assert "nota-cemento" in response.text
     assert "nota-otro" not in response.text
+
+
+def test_filter_movements_by_type(
+    operario_client: TestClient, material: Material
+) -> None:
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "10",
+            "movement_date": "2026-01-15",
+            "note": "nota-entrada",
+        },
+    )
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "salida",
+            "quantity": "2",
+            "movement_date": "2026-01-16",
+            "note": "nota-salida",
+        },
+    )
+
+    response = operario_client.get("/movements?type=salida")
+
+    assert response.status_code == 200
+    assert "nota-salida" in response.text
+    assert "nota-entrada" not in response.text
+
+
+def test_filter_movements_by_type_and_material_combined(
+    operario_client: TestClient, material: Material, db_session: Session
+) -> None:
+    other_material = Material(name="Otro material combinable", unit="unidad")
+    db_session.add(other_material)
+    db_session.commit()
+    db_session.refresh(other_material)
+
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "10",
+            "movement_date": "2026-01-15",
+            "note": "nota-material-entrada",
+        },
+    )
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(other_material.id),
+            "movement_type": "entrada",
+            "quantity": "5",
+            "movement_date": "2026-01-15",
+            "note": "nota-otro-entrada",
+        },
+    )
+
+    response = operario_client.get(f"/movements?type=entrada&material_id={material.id}")
+
+    assert response.status_code == 200
+    assert "nota-material-entrada" in response.text
+    assert "nota-otro-entrada" not in response.text
+
+
+def test_movements_invalid_type_is_ignored(
+    operario_client: TestClient, material: Material
+) -> None:
+    response = operario_client.get("/movements?type=no-existe")
+
+    assert response.status_code == 200
+
+
+def test_new_movement_form_shows_balance_per_material(
+    operario_client: TestClient, material: Material
+) -> None:
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "14",
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    response = operario_client.get("/movements/new")
+
+    assert response.status_code == 200
+    assert f"{material.name} · saldo 14" in response.text
