@@ -84,6 +84,11 @@ def inactive_user(db_session: Session) -> User:
 
 @pytest.fixture
 def admin_client(client: TestClient, admin_user: User) -> TestClient:
+    # admin_client and operario_client both log in on the SAME underlying
+    # `client`/session cookie. Never request both in one test — whichever
+    # fixture's login runs last silently wins for the whole test body. For
+    # a test that needs both roles, take `client` + `admin_user`/
+    # `operario_user` directly and log in/out explicitly.
     client.post(
         "/login", data={"username": admin_user.username, "password": "admin-pass"}
     )

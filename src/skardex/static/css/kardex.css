@@ -28,19 +28,19 @@
    Sin ese atributo la app queda en oscuro, que es el tema por defecto del
    design system. Ver README para el conmutador. */
 [data-theme="light"]{
-  --bg:#f8f9fc;
+  --bg:#e9edf5;
   --surface:#ffffff;
-  --surface2:#f0f4ff;
+  --surface2:#dde5f3;
   --accent:#2563eb;
   --accent2:#0891b2;
   --text:#1e3a5f;
-  --muted:#64748b;
-  --border:rgba(0,0,0,0.08);
-  --tag-bg:rgba(37,99,235,0.08);
+  --muted:#5b6b85;
+  --border:rgba(15,23,42,0.16);
+  --tag-bg:rgba(37,99,235,0.10);
   --tag-c:#1d4ed8;
-  --tag2-bg:rgba(8,145,178,0.08);
+  --tag2-bg:rgba(8,145,178,0.10);
   --tag2-c:#0369a1;
-  --nav-bg:rgba(248,249,252,0.90);
+  --nav-bg:rgba(233,237,245,0.92);
 }
 
 *{box-sizing:border-box}
