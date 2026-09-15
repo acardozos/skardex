@@ -44,8 +44,13 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.flake8-bugbear]
-# FastAPI usa Depends(...)/Query(...)/etc. como default de argumento a propósito.
-extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends"]
+# FastAPI intentionally uses Depends(...)/Form(...)/etc. as argument defaults.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.params.Depends",
+    "fastapi.Form",
+    "fastapi.params.Form",
+]
 
 [tool.mypy]
 python_version = "3.11"

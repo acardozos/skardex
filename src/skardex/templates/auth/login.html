@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Iniciar sesión — Simple Kardex{% endblock %}
+
+{% block content %}
+<article style="max-width: 400px; margin: 4rem auto;">
+    <hgroup>
+        <h1>Simple Kardex</h1>
+        <p>Ingresa con tu usuario y contraseña</p>
+    </hgroup>
+    {% if error %}
+    <p style="color: var(--pico-del-color);">{{ error }}</p>
+    {% endif %}
+    <form method="post" action="/login">
+        <label>
+            Usuario
+            <input type="text" name="username" required autofocus>
+        </label>
+        <label>
+            Contraseña
+            <input type="password" name="password" required>
+        </label>
+        <button type="submit">Ingresar</button>
+    </form>
+</article>
+{% endblock %}
