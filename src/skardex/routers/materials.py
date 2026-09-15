@@ -43,17 +43,36 @@ def _get_material_or_404(db: Session, material_id: int) -> Material:
     return material
 
 
+_VALID_ESTADOS = {"activos", "inactivos", "todos"}
+
+
 @router.get("")
 def list_materials(
     request: Request,
     user: CurrentUser,
     db: Session = Depends(get_db),
+    q: str = "",
+    estado: str = "activos",
 ) -> Response:
-    materials = db.query(Material).order_by(Material.name).all()
+    if estado not in _VALID_ESTADOS:
+        estado = "activos"
+
+    query = db.query(Material)
+    if estado == "activos":
+        query = query.filter(Material.is_active.is_(True))
+    elif estado == "inactivos":
+        query = query.filter(Material.is_active.is_(False))
+
+    q = q.strip()
+    if q:
+        like = f"%{q}%"
+        query = query.filter(Material.name.ilike(like) | Material.code.ilike(like))
+
+    materials = query.order_by(Material.name).all()
     return templates.TemplateResponse(
         request,
         "materials/list.html",
-        {"materials": materials, "user": user},
+        {"materials": materials, "user": user, "q": q, "estado": estado},
     )
 
 

@@ -213,3 +213,140 @@ def test_operario_cannot_reactivate_material(
     response = client.post(f"/materials/{material.id}/activate")
 
     assert response.status_code == 403
+
+
+def test_search_materials_by_name(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    db_session.add_all(
+        [
+            Material(name="Cemento gris", unit="saco"),
+            Material(name="Arena lavada", unit="m3"),
+        ]
+    )
+    db_session.commit()
+
+    response = admin_client.get("/materials?q=cemento")
+
+    assert response.status_code == 200
+    assert "Cemento gris" in response.text
+    assert "Arena lavada" not in response.text
+
+
+def test_search_materials_by_code(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    db_session.add_all(
+        [
+            Material(name="Cemento gris", unit="saco", code="CEM-1"),
+            Material(name="Arena lavada", unit="m3", code="ARE-1"),
+        ]
+    )
+    db_session.commit()
+
+    response = admin_client.get("/materials?q=CEM-1")
+
+    assert response.status_code == 200
+    assert "Cemento gris" in response.text
+    assert "Arena lavada" not in response.text
+
+
+def test_materials_default_estado_shows_only_active(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    db_session.add_all(
+        [
+            Material(name="Activo uno", unit="kg", is_active=True),
+            Material(name="Inactivo uno", unit="kg", is_active=False),
+        ]
+    )
+    db_session.commit()
+
+    response = admin_client.get("/materials")
+
+    assert response.status_code == 200
+    assert "Activo uno" in response.text
+    assert "Inactivo uno" not in response.text
+
+
+def test_materials_estado_inactivos_shows_only_inactive(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    db_session.add_all(
+        [
+            Material(name="Activo dos", unit="kg", is_active=True),
+            Material(name="Inactivo dos", unit="kg", is_active=False),
+        ]
+    )
+    db_session.commit()
+
+    response = admin_client.get("/materials?estado=inactivos")
+
+    assert response.status_code == 200
+    assert "Inactivo dos" in response.text
+    assert "Activo dos" not in response.text
+
+
+def test_materials_estado_todos_shows_both(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    db_session.add_all(
+        [
+            Material(name="Activo tres", unit="kg", is_active=True),
+            Material(name="Inactivo tres", unit="kg", is_active=False),
+        ]
+    )
+    db_session.commit()
+
+    response = admin_client.get("/materials?estado=todos")
+
+    assert response.status_code == 200
+    assert "Activo tres" in response.text
+    assert "Inactivo tres" in response.text
+
+
+def test_materials_invalid_estado_falls_back_to_activos(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    db_session.add_all(
+        [
+            Material(name="Activo cuatro", unit="kg", is_active=True),
+            Material(name="Inactivo cuatro", unit="kg", is_active=False),
+        ]
+    )
+    db_session.commit()
+
+    response = admin_client.get("/materials?estado=no-existe")
+
+    assert response.status_code == 200
+    assert "Activo cuatro" in response.text
+    assert "Inactivo cuatro" not in response.text
+
+
+def test_materials_combine_search_and_estado(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    db_session.add_all(
+        [
+            Material(name="Cemento activo", unit="kg", is_active=True),
+            Material(name="Cemento inactivo", unit="kg", is_active=False),
+            Material(name="Arena activa", unit="kg", is_active=True),
+        ]
+    )
+    db_session.commit()
+
+    response = admin_client.get("/materials?q=cemento&estado=inactivos")
+
+    assert response.status_code == 200
+    assert "Cemento inactivo" in response.text
+    assert "Cemento activo" not in response.text
+    assert "Arena activa" not in response.text
+
+
+def test_operario_does_not_see_estado_filter_control(
+    operario_client: TestClient,
+) -> None:
+    response = operario_client.get("/materials")
+
+    assert response.status_code == 200
+    assert "k-seg" not in response.text

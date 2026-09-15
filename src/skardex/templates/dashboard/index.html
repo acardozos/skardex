@@ -45,7 +45,7 @@
         </div>
         <div class="k-chips">
             {% for item in items if item.is_low %}
-            <div class="k-chip">{{ item.material.name }} <span>{{ item.balance }} de {{ item.material.min_stock }} {{ item.material.unit }}</span></div>
+            <div class="k-chip">{{ item.material.name }} <span>{{ item.balance }} de {{ item.material.min_stock }} {{ unit_labels.get(item.material.unit, item.material.unit) }}</span></div>
             {% endfor %}
         </div>
     </div>
@@ -72,7 +72,7 @@
                 {% for item in items %}
                 <tr>
                     <td data-label="Material" class="k-strong">{{ item.material.name }}</td>
-                    <td data-label="Unidad" class="k-dim">{{ item.material.unit }}</td>
+                    <td data-label="Unidad" class="k-dim">{{ unit_labels.get(item.material.unit, item.material.unit) }}</td>
                     <td data-label="Saldo actual" class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance }}</td>
                     <td data-label="Stock mínimo" class="k-num k-dim">{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
                     <td data-label="Estado" class="k-num"><span class="k-tag{{ '' if item.is_low else ' k-tag--ok' }}">{{ "Bajo mínimo" if item.is_low else "En orden" }}</span></td>

@@ -3,52 +3,97 @@
 {% block title %}Materiales — Simple Kardex{% endblock %}
 
 {% block content %}
-<hgroup>
-    <h1>Materiales</h1>
-    <p>Catálogo de materiales e insumos</p>
-</hgroup>
-
-{% if user.role == "admin" %}
-<p><a href="/materials/new" role="button">Nuevo material</a></p>
-{% endif %}
-
-<table>
-    <thead>
-        <tr>
-            <th>Código</th>
-            <th>Nombre</th>
-            <th>Unidad</th>
-            <th>Stock mínimo</th>
-            <th>Estado</th>
+<main class="k-main">
+    <div class="k-page-head">
+        <div>
+            <p class="k-eyebrow">Catálogo</p>
+            <h1>Materiales</h1>
             {% if user.role == "admin" %}
-            <th>Acciones</th>
+            <p>Materiales e insumos que puedes mover en el kardex.</p>
+            {% else %}
+            <p>Consulta los materiales disponibles y su unidad de medida.</p>
             {% endif %}
-        </tr>
-    </thead>
-    <tbody>
-        {% for material in materials %}
-        <tr>
-            <td>{{ material.code or "-" }}</td>
-            <td>{{ material.name }}</td>
-            <td>{{ material.unit }}</td>
-            <td>{{ material.min_stock if material.min_stock is not none else "-" }}</td>
-            <td>{{ "Activo" if material.is_active else "Inactivo" }}</td>
+        </div>
+        {% if user.role == "admin" %}
+        <a class="k-btn k-btn--primary" href="/materials/new">Nuevo material</a>
+        {% else %}
+        <span class="k-readonly"><span class="k-dot"></span> Solo lectura — el catálogo lo administra el dueño</span>
+        {% endif %}
+    </div>
+
+    <div class="k-toolbar">
+        <form method="get" action="/materials">
+            <input type="hidden" name="estado" value="{{ estado }}">
+            <input class="k-input" type="search" name="q" placeholder="Buscar por nombre o código" value="{{ q }}">
+        </form>
+        {% if user.role == "admin" %}
+        <nav class="k-seg">
+            <a class="{% if estado == 'activos' %}is-active{% endif %}" href="/materials?estado=activos{% if q %}&q={{ q | urlencode }}{% endif %}">Activos</a>
+            <a class="{% if estado == 'inactivos' %}is-active{% endif %}" href="/materials?estado=inactivos{% if q %}&q={{ q | urlencode }}{% endif %}">Inactivos</a>
+            <a class="{% if estado == 'todos' %}is-active{% endif %}" href="/materials?estado=todos{% if q %}&q={{ q | urlencode }}{% endif %}">Todos</a>
+        </nav>
+        {% endif %}
+    </div>
+
+    <div class="k-card">
+        <table class="k-table">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Unidad</th>
+                    <th class="k-num">Stock mínimo</th>
+                    <th>Estado</th>
+                    {% if user.role == "admin" %}
+                    <th class="k-num">Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for material in materials %}
+                <tr>
+                    <td data-label="Código" class="k-dim">{{ material.code or "-" }}</td>
+                    <td data-label="Nombre" class="k-strong">{{ material.name }}</td>
+                    <td data-label="Unidad" class="k-dim">{{ unit_labels.get(material.unit, material.unit) }}</td>
+                    <td data-label="Stock mínimo" class="k-num">{{ material.min_stock if material.min_stock is not none else "-" }}</td>
+                    <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if material.is_active else ' k-tag--muted' }}">{{ "Activo" if material.is_active else "Inactivo" }}</span></td>
+                    {% if user.role == "admin" %}
+                    <td data-label="Acciones" class="k-cell--wide">
+                        <div class="k-actions">
+                            <a class="k-btn k-btn--ghost k-btn--sm" href="/materials/{{ material.id }}/edit">Editar</a>
+                            {% if material.is_active %}
+                            <form method="post" action="/materials/{{ material.id }}/deactivate"
+                                  onsubmit="return confirm('¿Desactivar {{ material.name }}? Dejará de aparecer en Inicio y no podrás registrarle movimientos. Su historial se conserva.');">
+                                <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Desactivar</button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="/materials/{{ material.id }}/activate">
+                                <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Activar</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if not materials %}
+        <div class="k-empty">
+            <span class="k-empty__icon">📦</span>
+            {% if q or estado != "activos" %}
+            <h3>Sin resultados</h3>
+            <p>Ningún material coincide con ese filtro o búsqueda.</p>
+            {% else %}
+            <h3>Aún no hay materiales</h3>
+            <p>El catálogo es la base del kardex: crea un material y luego podrás registrar sus entradas y salidas.</p>
             {% if user.role == "admin" %}
-            <td>
-                <a href="/materials/{{ material.id }}/edit">Editar</a>
-                {% if material.is_active %}
-                <form method="post" action="/materials/{{ material.id }}/deactivate" style="display:inline;">
-                    <button type="submit" class="secondary">Desactivar</button>
-                </form>
-                {% else %}
-                <form method="post" action="/materials/{{ material.id }}/activate" style="display:inline;">
-                    <button type="submit">Activar</button>
-                </form>
-                {% endif %}
-            </td>
+            <a class="k-btn k-btn--primary" href="/materials/new">Nuevo material</a>
             {% endif %}
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</main>
 {% endblock %}
