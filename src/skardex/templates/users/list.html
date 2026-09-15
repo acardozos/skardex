@@ -3,47 +3,58 @@
 {% block title %}Usuarios — Simple Kardex{% endblock %}
 
 {% block content %}
-<hgroup>
-    <h1>Usuarios</h1>
-    <p>Cuentas con acceso a Simple Kardex</p>
-</hgroup>
+<main class="k-main">
+    <div class="k-page-head">
+        <div>
+            <p class="k-eyebrow">Acceso</p>
+            <h1>Usuarios</h1>
+            <p>Cuentas con acceso a Simple Kardex. Solo el admin las administra.</p>
+        </div>
+        <a class="k-btn k-btn--primary" href="/users/new">Nuevo operario</a>
+    </div>
 
-{% if error %}
-<p style="color: var(--pico-del-color);">{{ error }}</p>
-{% endif %}
+    {% if error %}
+    <p class="k-banner">{{ error }}</p>
+    {% endif %}
 
-<p><a href="/users/new" role="button">Nuevo operario</a></p>
+    <div class="k-card">
+        <table class="k-table">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th class="k-num">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td data-label="Usuario" class="k-strong">{{ u.username }}</td>
+                    <td data-label="Rol" class="k-dim">{{ "Admin" if u.role == "admin" else "Operario" }}</td>
+                    <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if u.is_active else ' k-tag--muted' }}">{{ "Activo" if u.is_active else "Inactivo" }}</span></td>
+                    <td data-label="Acciones" class="k-cell--wide">
+                        <div class="k-actions">
+                            {% if u.role == "admin" %}
+                            <span class="k-dim">Cuenta del dueño</span>
+                            {% elif u.is_active %}
+                            <form method="post" action="/users/{{ u.id }}/deactivate"
+                                  onsubmit="return confirm('¿Desactivar a {{ u.username }}? Perderá el acceso de inmediato. Sus movimientos siguen en el historial.');">
+                                <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Desactivar</button>
+                            </form>
+                            {% else %}
+                            <form method="post" action="/users/{{ u.id }}/activate">
+                                <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Activar</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-<table>
-    <thead>
-        <tr>
-            <th>Usuario</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for u in users %}
-        <tr>
-            <td>{{ u.username }}</td>
-            <td>{{ "Admin" if u.role == "admin" else "Operario" }}</td>
-            <td>{{ "Activo" if u.is_active else "Inactivo" }}</td>
-            <td>
-                {% if u.role == "admin" %}
-                -
-                {% elif u.is_active %}
-                <form method="post" action="/users/{{ u.id }}/deactivate" style="display:inline;">
-                    <button type="submit" class="secondary">Desactivar</button>
-                </form>
-                {% else %}
-                <form method="post" action="/users/{{ u.id }}/activate" style="display:inline;">
-                    <button type="submit">Activar</button>
-                </form>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <p class="k-note">Desactivar una cuenta le quita el acceso, pero conserva sus movimientos en el historial — nada se borra.</p>
+</main>
 {% endblock %}
