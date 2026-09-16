@@ -30,14 +30,27 @@ def db_session() -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient, None, None]:
+def _db_override(db_session: Session) -> Generator[None, None, None]:
+    """Route the app's get_db dependency to the test's in-memory session.
+
+    This only wires up dependency injection (shared, since it's global
+    state on `app`); it does NOT create a TestClient, so each client
+    fixture below can build its own independent instance (own cookie
+    jar/session) while still hitting the same database.
+    """
+
     def override_get_db() -> Generator[Session, None, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(_db_override: None) -> Generator[TestClient, None, None]:
     with TestClient(app) as test_client:
         yield test_client
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -83,24 +96,30 @@ def inactive_user(db_session: Session) -> User:
 
 
 @pytest.fixture
-def admin_client(client: TestClient, admin_user: User) -> TestClient:
-    # admin_client and operario_client both log in on the SAME underlying
-    # `client`/session cookie. Never request both in one test — whichever
-    # fixture's login runs last silently wins for the whole test body. For
-    # a test that needs both roles, take `client` + `admin_user`/
-    # `operario_user` directly and log in/out explicitly.
-    client.post(
-        "/login", data={"username": admin_user.username, "password": "admin-pass"}
-    )
-    return client
+def admin_client(
+    _db_override: None, admin_user: User
+) -> Generator[TestClient, None, None]:
+    # Its own TestClient/cookie jar (not the `client` fixture's) so it can
+    # safely be combined with `operario_client` in the same test — each
+    # behaves like an independent logged-in browser, both hitting the same
+    # underlying `db_session` via `_db_override`.
+    with TestClient(app) as test_client:
+        test_client.post(
+            "/login", data={"username": admin_user.username, "password": "admin-pass"}
+        )
+        yield test_client
 
 
 @pytest.fixture
-def operario_client(client: TestClient, operario_user: User) -> TestClient:
-    client.post(
-        "/login", data={"username": operario_user.username, "password": "operario-pass"}
-    )
-    return client
+def operario_client(
+    _db_override: None, operario_user: User
+) -> Generator[TestClient, None, None]:
+    with TestClient(app) as test_client:
+        test_client.post(
+            "/login",
+            data={"username": operario_user.username, "password": "operario-pass"},
+        )
+        yield test_client
 
 
 @pytest.fixture

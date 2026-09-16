@@ -22,24 +22,28 @@ def test_nav_marks_current_route_as_active(admin_client: TestClient) -> None:
 
 
 def test_users_link_shown_only_to_admin(
-    client: TestClient, admin_user: User, operario_user: User
+    admin_client: TestClient, operario_client: TestClient
 ) -> None:
-    # `admin_client`/`operario_client` share one TestClient/session cookie,
-    # so they can't both be used in the same test (the second login
-    # overwrites the first). Log in/out explicitly on the shared `client`.
-    client.post(
-        "/login", data={"username": admin_user.username, "password": "admin-pass"}
-    )
-    admin_response = client.get("/")
-    client.post("/logout")
-
-    client.post(
-        "/login", data={"username": operario_user.username, "password": "operario-pass"}
-    )
-    operario_response = client.get("/")
+    admin_response = admin_client.get("/")
+    operario_response = operario_client.get("/")
 
     assert 'href="/users"' in admin_response.text
     assert 'href="/users"' not in operario_response.text
+
+
+def test_admin_client_and_operario_client_are_independent_sessions(
+    admin_client: TestClient, operario_client: TestClient
+) -> None:
+    # Regression test for a bug that hit this project 3 times: earlier,
+    # admin_client and operario_client shared one TestClient/cookie, so
+    # requesting both in the same test made the second login silently
+    # win for both. They now each build their own TestClient, so this
+    # must hold regardless of which fixture pytest resolves last.
+    admin_response = admin_client.get("/")
+    operario_response = operario_client.get("/")
+
+    assert "admin · Admin" in admin_response.text
+    assert "operario1 · Operario" in operario_response.text
 
 
 def test_header_absent_without_session(client: TestClient) -> None:
@@ -79,10 +83,8 @@ def test_deactivate_material_button_has_confirm_dialog(
 def test_deactivate_user_button_has_confirm_dialog(
     admin_client: TestClient, operario_user: User
 ) -> None:
-    # Note: only `operario_user` (creates the DB row) is used here, not
-    # `operario_client` (which also logs in) — combining admin_client and
-    # operario_client in one test would make the second login overwrite
-    # the first in their shared TestClient session cookie.
+    # Only `operario_user` (creates the DB row) is needed here, not
+    # `operario_client` (which also logs in and isn't used by this test).
     response = admin_client.get("/users")
 
     assert response.status_code == 200
