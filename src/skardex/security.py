@@ -24,7 +24,13 @@ class NotAuthenticatedError(Exception):
     """Raised when there is no valid session; translated into a redirect to /login."""
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+class PasswordChangeRequiredError(Exception):
+    """Raised when the user must replace a temporary password before continuing."""
+
+
+def get_current_user_allow_pending(
+    request: Request, db: Session = Depends(get_db)
+) -> User:
     user_id = request.session.get(SESSION_USER_ID_KEY)
     if user_id is None:
         raise NotAuthenticatedError()
@@ -33,6 +39,14 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     if user is None or not user.is_active:
         raise NotAuthenticatedError()
 
+    return user
+
+
+def get_current_user(
+    user: Annotated[User, Depends(get_current_user_allow_pending)],
+) -> User:
+    if user.must_change_password:
+        raise PasswordChangeRequiredError()
     return user
 
 

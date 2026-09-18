@@ -22,6 +22,7 @@ class User(Base):
         Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e])
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

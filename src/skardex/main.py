@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from skardex.config import settings
 from skardex.routers import auth, dashboard, materials, movements, users
-from skardex.security import NotAuthenticatedError
+from skardex.security import NotAuthenticatedError, PasswordChangeRequiredError
 from skardex.templating import templates
 
 logger = logging.getLogger("skardex")
@@ -42,6 +42,14 @@ def create_app() -> FastAPI:
         request: Request, exc: NotAuthenticatedError
     ) -> RedirectResponse:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.exception_handler(PasswordChangeRequiredError)
+    async def password_change_required_handler(
+        request: Request, exc: PasswordChangeRequiredError
+    ) -> RedirectResponse:
+        return RedirectResponse(
+            url="/account/set-password", status_code=status.HTTP_303_SEE_OTHER
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(
