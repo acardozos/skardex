@@ -60,3 +60,15 @@ def test_logout_clears_session_and_redirects_to_login(
 
     assert response.status_code == 303
     assert response.headers["location"] == "/login"
+
+
+def test_login_page_offers_no_forgot_password_flow(client: TestClient) -> None:
+    """EARS-H2-01: recovery goes through the admin, not through the app."""
+    html = client.get("/login").text.lower()
+
+    for hint in ("olvid", "recuper", "forgot", "reset"):
+        assert hint not in html
+    assert html.count("<a ") == 0
+
+    for path in ("/forgot-password", "/reset-password", "/password-reset"):
+        assert client.get(path, follow_redirects=False).status_code == 404
