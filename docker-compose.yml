@@ -1,0 +1,23 @@
+# Local development database only. The app itself runs with `uv run uvicorn`.
+# Credentials are throwaway and the port is bound to localhost: this database
+# must never be exposed or reused for anything real.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: skardex-dev-db
+    environment:
+      POSTGRES_USER: skardex
+      POSTGRES_PASSWORD: skardex
+      POSTGRES_DB: skardex_dev
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - skardex_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skardex -d skardex_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  skardex_dev_pgdata:

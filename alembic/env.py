@@ -1,6 +1,8 @@
+import logging
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 
 from alembic import context
 from skardex.config import settings
@@ -18,6 +20,13 @@ config.set_main_option("sqlalchemy.url", settings.database_url)
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Make the target visible in the output (password not included): running a
+# migration against the wrong database is easy to miss otherwise.
+_target = make_url(settings.database_url)
+logging.getLogger("alembic.env").info(
+    "Alembic target database: %s/%s", _target.host or "(local file)", _target.database
+)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

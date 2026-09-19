@@ -36,20 +36,31 @@ calculated balances, and low-stock alerts.
 
 ## Local development
 
-Requires [uv](https://docs.astral.sh/uv/getting-started/installation/)
-and Python 3.11+ (uv can install it for you).
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/),
+Python 3.11+ (uv can install it for you) and Docker (for the local database).
 
 ```bash
 git clone git@github.com:acardozos/skardex.git
 cd skardex
 uv sync
-cp .env.example .env  # fill in DATABASE_URL, SECRET_KEY, etc.
+cp .env.example .env  # already points at the local database; set SECRET_KEY and SEED_ADMIN_PASSWORD
+docker compose up -d --wait db  # local PostgreSQL on 127.0.0.1:5433
 uv run alembic upgrade head
 uv run python -m skardex.seed_admin  # creates the initial admin user
 uv run uvicorn skardex.main:app --reload
 ```
 
 The app is now at `http://127.0.0.1:8000`.
+
+The local database lives in a Docker volume and survives restarts. Stop it
+with `docker compose down`, or wipe it and start over with
+`docker compose down -v`.
+
+**Never point your local `.env` at production.** The production database URL
+lives only in the hosting environment. Migrations and the container's start
+command change the schema, so running them from a laptop against production
+can break the deployed app. Alembic logs the database it is about to migrate
+(`Alembic target database: ...`); check it when in doubt.
 
 ### Forgotten admin password
 
