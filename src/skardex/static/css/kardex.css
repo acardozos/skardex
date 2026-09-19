@@ -179,6 +179,7 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-radio input:focus-visible + .k-btn{outline:2px solid var(--accent);outline-offset:2px}
 .k-form__actions form{margin:0}
 .k-banner{margin:0 0 18px;background:var(--bg);border:1px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:14px;color:var(--text)}
+.k-banner--ok{border-color:var(--tag2-c)}
 .k-hint{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:13px;color:var(--muted);margin:0;line-height:1.5}
 .k-readonly{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:13px;color:var(--muted)}
 .k-readonly .k-dot{background:var(--muted)}

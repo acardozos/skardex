@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from skardex.config import settings
-from skardex.routers import auth, dashboard, materials, movements, users
+from skardex.routers import account, auth, dashboard, materials, movements, users
 from skardex.security import NotAuthenticatedError, PasswordChangeRequiredError
 from skardex.templating import templates
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
         https_only=settings.session_https_only,
     )
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    app.include_router(account.router)
     app.include_router(auth.router)
     app.include_router(dashboard.router)
     app.include_router(materials.router)

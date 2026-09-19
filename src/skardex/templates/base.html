@@ -33,7 +33,7 @@
                 <span class="k-user__avatar">{{ request.session.get("username", "")[:2].upper() }}</span>{{ request.session.get("username") }} · {{ "Admin" if request.session.get("role") == "admin" else "Operario" }}
             </span>
             <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
-            <!-- Espacio reservado para el enlace de cuenta/cambiar contraseña (spec 003) -->
+            <a class="k-btn k-btn--ghost k-btn--sm{% if request.url.path.startswith('/account') %} is-active{% endif %}" href="/account/password">Mi cuenta</a>
             <form method="post" action="/logout">
                 <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Salir</button>
             </form>
@@ -48,6 +48,7 @@
                 {% if request.session.get("role") == "admin" %}
                 <a class="{% if request.url.path.startswith('/users') %}is-active{% endif %}" href="/users">Usuarios</a>
                 {% endif %}
+                <a class="{% if request.url.path.startswith('/account') %}is-active{% endif %}" href="/account/password">Mi cuenta</a>
                 <div class="k-menu__foot">
                     <span>{{ request.session.get("username") }} · {{ "Admin" if request.session.get("role") == "admin" else "Operario" }}</span>
                     <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
