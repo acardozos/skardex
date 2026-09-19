@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     secret_key: str
     seed_admin_username: str
     seed_admin_password: str
+    # Only needed on the day skardex.reset_admin_password is run; leave unset
+    # otherwise.
+    admin_reset_password: str | None = None
     # Must be True in production (Render serves over HTTPS). Defaults to
     # False so local dev over http://localhost keeps working out of the box.
     session_https_only: bool = False

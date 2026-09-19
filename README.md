@@ -51,6 +51,19 @@ uv run uvicorn skardex.main:app --reload
 
 The app is now at `http://127.0.0.1:8000`.
 
+### Forgotten admin password
+
+Operarios get a temporary password from the admin (Users screen), but the
+admin has no one above them, so recovery is a console command. Set
+`ADMIN_RESET_PASSWORD` temporarily (in `.env` locally, or in the Render
+environment), run it, and remove the variable afterwards:
+
+```bash
+uv run python -m skardex.reset_admin_password
+```
+
+The admin must choose a new password at the next login.
+
 ### Tests and quality
 
 ```bash
