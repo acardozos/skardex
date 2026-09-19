@@ -18,6 +18,10 @@ class InvalidMinStockError(Exception):
     """Raised when min_stock is negative or not a valid number."""
 
 
+class InvalidSalePriceError(Exception):
+    """Raised when the reference sale price is zero or negative."""
+
+
 def normalize_code(code: str | None) -> str | None:
     if code is None:
         return None
@@ -33,12 +37,18 @@ def save_material(
     unit: str,
     code: str | None,
     min_stock: Decimal | None,
+    sale_price: Decimal | None,
 ) -> Material:
     if unit not in UNITS:
         raise InvalidUnitError(unit)
 
     if min_stock is not None and min_stock < 0:
         raise InvalidMinStockError(min_stock)
+
+    # None means "no reference price"; zero is not allowed because it would
+    # be indistinguishable from a free sale and hide that the price is missing.
+    if sale_price is not None and sale_price <= 0:
+        raise InvalidSalePriceError(sale_price)
 
     normalized_code = normalize_code(code)
     if normalized_code is not None:
@@ -56,6 +66,7 @@ def save_material(
     material.unit = unit
     material.code = normalized_code
     material.min_stock = min_stock
+    material.sale_price = sale_price
 
     db.commit()
     db.refresh(material)

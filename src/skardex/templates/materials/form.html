@@ -39,6 +39,11 @@
                     <span class="k-help">Debajo de este saldo se avisa en Inicio.</span>
                 </div>
             </div>
+            <div class="k-field">
+                <label class="k-label" for="sale_price">Precio de venta (opcional)</label>
+                <input class="k-input" type="number" step="0.01" min="0.01" id="sale_price" name="sale_price" placeholder="0,00" value="{{ material.sale_price if material and material.sale_price is not none else '' }}">
+                <span class="k-help">Por unidad de medida, en pesos. Es el precio de las salidas por venta; vacío = sin precio.</span>
+            </div>
             <div class="k-form__actions">
                 <button type="submit" class="k-btn k-btn--primary">Guardar</button>
                 <a class="k-btn k-btn--ghost" href="/materials">Cancelar</a>

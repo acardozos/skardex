@@ -7,10 +7,12 @@ from sqlalchemy.orm import Session
 from skardex.constants import UNITS
 from skardex.db import get_db
 from skardex.models import Material, User
+from skardex.money import InvalidMoneyError, parse_money
 from skardex.security import CurrentUser, require_admin
 from skardex.services.material_service import (
     DuplicateMaterialCodeError,
     InvalidMinStockError,
+    InvalidSalePriceError,
     InvalidUnitError,
     activate_material,
     deactivate_material,
@@ -33,6 +35,8 @@ def _error_message(exc: Exception) -> str:
         return "Ya existe un material con ese código."
     if isinstance(exc, InvalidUnitError):
         return "La unidad de medida no es válida."
+    if isinstance(exc, InvalidSalePriceError | InvalidMoneyError):
+        return "El precio de venta debe ser un número mayor a cero."
     return "El stock mínimo debe ser un número mayor o igual a cero."
 
 
@@ -44,6 +48,14 @@ def _get_material_or_404(db: Session, material_id: int) -> Material:
 
 
 _VALID_ESTADOS = {"activos", "inactivos", "todos"}
+_SAVE_ERRORS = (
+    DuplicateMaterialCodeError,
+    InvalidUnitError,
+    InvalidMinStockError,
+    InvalidSalePriceError,
+    InvalidMoneyError,
+    InvalidOperation,
+)
 
 
 @router.get("")
@@ -53,15 +65,23 @@ def list_materials(
     db: Session = Depends(get_db),
     q: str = "",
     estado: str = "activos",
+    precio: str = "",
 ) -> Response:
     if estado not in _VALID_ESTADOS:
         estado = "activos"
+    # The only supported value is "sin" (materials without a reference price);
+    # anything else means no price filter.
+    if precio != "sin":
+        precio = ""
 
     query = db.query(Material)
     if estado == "activos":
         query = query.filter(Material.is_active.is_(True))
     elif estado == "inactivos":
         query = query.filter(Material.is_active.is_(False))
+
+    if precio == "sin":
+        query = query.filter(Material.sale_price.is_(None))
 
     q = q.strip()
     if q:
@@ -72,7 +92,13 @@ def list_materials(
     return templates.TemplateResponse(
         request,
         "materials/list.html",
-        {"materials": materials, "user": user, "q": q, "estado": estado},
+        {
+            "materials": materials,
+            "user": user,
+            "q": q,
+            "estado": estado,
+            "precio": precio,
+        },
     )
 
 
@@ -97,6 +123,7 @@ def create_material(
     name: str = Form(...),
     unit: str = Form(...),
     min_stock: str = Form(""),
+    sale_price: str = Form(""),
 ) -> Response:
     try:
         parsed_min_stock = _parse_min_stock(min_stock)
@@ -107,13 +134,9 @@ def create_material(
             unit=unit,
             code=code or None,
             min_stock=parsed_min_stock,
+            sale_price=parse_money(sale_price),
         )
-    except (
-        DuplicateMaterialCodeError,
-        InvalidUnitError,
-        InvalidMinStockError,
-        InvalidOperation,
-    ) as exc:
+    except _SAVE_ERRORS as exc:
         return templates.TemplateResponse(
             request,
             "materials/form.html",
@@ -149,6 +172,7 @@ def update_material(
     name: str = Form(...),
     unit: str = Form(...),
     min_stock: str = Form(""),
+    sale_price: str = Form(""),
 ) -> Response:
     material = _get_material_or_404(db, material_id)
 
@@ -161,13 +185,9 @@ def update_material(
             unit=unit,
             code=code or None,
             min_stock=parsed_min_stock,
+            sale_price=parse_money(sale_price),
         )
-    except (
-        DuplicateMaterialCodeError,
-        InvalidUnitError,
-        InvalidMinStockError,
-        InvalidOperation,
-    ) as exc:
+    except _SAVE_ERRORS as exc:
         return templates.TemplateResponse(
             request,
             "materials/form.html",

@@ -24,13 +24,18 @@
     <div class="k-toolbar">
         <form method="get" action="/materials">
             <input type="hidden" name="estado" value="{{ estado }}">
+            <input type="hidden" name="precio" value="{{ precio }}">
             <input class="k-input" type="search" name="q" placeholder="Buscar por nombre o código" value="{{ q }}">
         </form>
         {% if user.role == "admin" %}
+        {% set keep = ("&q=" ~ (q | urlencode) if q else "") ~ ("&precio=sin" if precio == "sin" else "") %}
         <nav class="k-seg">
-            <a class="{% if estado == 'activos' %}is-active{% endif %}" href="/materials?estado=activos{% if q %}&q={{ q | urlencode }}{% endif %}">Activos</a>
-            <a class="{% if estado == 'inactivos' %}is-active{% endif %}" href="/materials?estado=inactivos{% if q %}&q={{ q | urlencode }}{% endif %}">Inactivos</a>
-            <a class="{% if estado == 'todos' %}is-active{% endif %}" href="/materials?estado=todos{% if q %}&q={{ q | urlencode }}{% endif %}">Todos</a>
+            <a class="{% if estado == 'activos' %}is-active{% endif %}" href="/materials?estado=activos{{ keep }}">Activos</a>
+            <a class="{% if estado == 'inactivos' %}is-active{% endif %}" href="/materials?estado=inactivos{{ keep }}">Inactivos</a>
+            <a class="{% if estado == 'todos' %}is-active{% endif %}" href="/materials?estado=todos{{ keep }}">Todos</a>
+        </nav>
+        <nav class="k-seg">
+            <a class="{% if precio == 'sin' %}is-active{% endif %}" href="/materials?estado={{ estado }}{% if q %}&q={{ q | urlencode }}{% endif %}{% if precio != 'sin' %}&precio=sin{% endif %}">Sin precio</a>
         </nav>
         {% endif %}
     </div>
@@ -43,6 +48,7 @@
                     <th>Nombre</th>
                     <th>Unidad</th>
                     <th class="k-num">Stock mínimo</th>
+                    <th class="k-num">Precio de venta</th>
                     <th>Estado</th>
                     {% if user.role == "admin" %}
                     <th class="k-num">Acciones</th>
@@ -56,6 +62,7 @@
                     <td data-label="Nombre" class="k-strong">{{ material.name }}</td>
                     <td data-label="Unidad" class="k-dim">{{ unit_labels.get(material.unit, material.unit) }}</td>
                     <td data-label="Stock mínimo" class="k-num">{{ material.min_stock if material.min_stock is not none else "-" }}</td>
+                    <td data-label="Precio de venta" class="k-num">{% if material.sale_price is not none %}{{ material.sale_price | cop }}{% else %}<span class="k-tag">Sin precio</span>{% endif %}</td>
                     <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if material.is_active else ' k-tag--muted' }}">{{ "Activo" if material.is_active else "Inactivo" }}</span></td>
                     {% if user.role == "admin" %}
                     <td data-label="Acciones" class="k-cell--wide">
@@ -82,7 +89,7 @@
         {% if not materials %}
         <div class="k-empty">
             <span class="k-empty__icon">📦</span>
-            {% if q or estado != "activos" %}
+            {% if q or estado != "activos" or precio == "sin" %}
             <h3>Sin resultados</h3>
             <p>Ningún material coincide con ese filtro o búsqueda.</p>
             {% else %}
