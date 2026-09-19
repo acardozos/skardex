@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/htmx.org@2" defer></script>
 </head>
 <body>
-{% if request.session.get("user_id") %}
+{% if request.session.get("user_id") and not hide_nav %}
 <header class="k-header">
     <div class="k-header__inner">
         <a class="k-brand" href="/">

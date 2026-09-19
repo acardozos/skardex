@@ -37,7 +37,8 @@ def login_submit(
     request.session[SESSION_USER_ID_KEY] = user.id
     request.session[SESSION_ROLE_KEY] = user.role.value
     request.session[SESSION_USERNAME_KEY] = user.username
-    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    destination = "/account/set-password" if user.must_change_password else "/"
+    return RedirectResponse(url=destination, status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.post("/logout")
