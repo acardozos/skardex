@@ -1,7 +1,12 @@
+import re
+
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from skardex.models import User
+from skardex.security import verify_password
+from skardex.services.user_service import MIN_PASSWORD_LENGTH
 
 
 def test_users_list_requires_login(client: TestClient) -> None:
@@ -99,3 +104,154 @@ def test_cannot_deactivate_last_active_admin(
     assert response.status_code == 400
     db_session.refresh(admin_user)
     assert admin_user.is_active is True
+
+
+def _reset(client: TestClient, user: User) -> Response:
+    return client.post(f"/users/{user.id}/reset-password")
+
+
+def _temp_password_from(html: str) -> str:
+    match = re.search(r"<code[^>]*>\s*([^<\s]+)\s*</code>", html)
+    assert match is not None, "temporary password banner not found"
+    return match.group(1)
+
+
+def test_users_list_shows_reset_button_for_active_operarios_only(
+    admin_client: TestClient,
+    admin_user: User,
+    operario_user: User,
+    inactive_user: User,
+) -> None:
+    """EARS-H3-01, EARS-H3-04, EARS-H3-05 (UI side)"""
+    html = admin_client.get("/users").text
+
+    assert f'action="/users/{operario_user.id}/reset-password"' in html
+    assert f'action="/users/{admin_user.id}/reset-password"' not in html
+    assert f'action="/users/{inactive_user.id}/reset-password"' not in html
+
+
+def test_reset_button_asks_for_confirmation(
+    admin_client: TestClient, operario_user: User
+) -> None:
+    html = admin_client.get("/users").text
+
+    form = html.split(f'action="/users/{operario_user.id}/reset-password"')[1]
+    assert "confirm(" in form.split("</form>")[0]
+
+
+def test_admin_reset_redirects_and_shows_temporary_password_once(
+    admin_client: TestClient, operario_user: User, db_session: Session
+) -> None:
+    """EARS-H3-02"""
+    post = admin_client.post(
+        f"/users/{operario_user.id}/reset-password", follow_redirects=False
+    )
+
+    assert post.status_code == 303
+    assert post.headers["location"] == "/users"
+    db_session.refresh(operario_user)
+    assert operario_user.must_change_password is True
+
+    page = admin_client.get("/users")
+    assert page.status_code == 200
+    assert page.headers["cache-control"] == "no-store"
+    temporary = _temp_password_from(page.text)
+    assert len(temporary) == MIN_PASSWORD_LENGTH
+    assert operario_user.username in page.text
+    assert verify_password(temporary, operario_user.password_hash)
+
+    assert temporary not in admin_client.get("/users").text
+
+
+def test_reloading_users_after_reset_does_not_generate_another_password(
+    admin_client: TestClient, operario_user: User, db_session: Session
+) -> None:
+    """EARS-H3-02 (a reload must not repeat the reset, nor keep showing it)"""
+    temporary = _temp_password_from(_reset(admin_client, operario_user).text)
+    hash_after_reset = operario_user.password_hash
+
+    for _ in range(3):
+        page = admin_client.get("/users")
+        assert "temp-password-banner" not in page.text
+        assert temporary not in page.text
+
+    db_session.refresh(operario_user)
+    assert operario_user.password_hash == hash_after_reset
+    assert verify_password(temporary, operario_user.password_hash)
+
+
+def test_operario_can_login_with_temporary_password_and_is_forced_to_change_it(
+    admin_client: TestClient, operario_user: User, client: TestClient
+) -> None:
+    """EARS-H3-02 (end to end with the forced-change screen)"""
+    temporary = _temp_password_from(_reset(admin_client, operario_user).text)
+
+    old_login = client.post(
+        "/login", data={"username": operario_user.username, "password": "operario-pass"}
+    )
+    assert old_login.status_code == 401
+    new_login = client.post(
+        "/login",
+        data={"username": operario_user.username, "password": temporary},
+        follow_redirects=False,
+    )
+    assert new_login.status_code == 303
+    assert new_login.headers["location"] == "/account/set-password"
+
+
+def test_operario_cannot_reset_passwords(
+    operario_client: TestClient, operario_user: User, db_session: Session
+) -> None:
+    """EARS-H3-03"""
+    old_hash = operario_user.password_hash
+
+    response = _reset(operario_client, operario_user)
+
+    assert response.status_code == 403
+    db_session.refresh(operario_user)
+    assert operario_user.password_hash == old_hash
+    assert operario_user.must_change_password is False
+
+
+def test_reset_requires_login(client: TestClient, operario_user: User) -> None:
+    response = client.post(
+        f"/users/{operario_user.id}/reset-password", follow_redirects=False
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+
+
+def test_admin_password_cannot_be_reset_from_users_screen(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-04 (direct request, since the UI hides the button)"""
+    old_hash = admin_user.password_hash
+
+    response = _reset(admin_client, admin_user)
+
+    assert response.status_code == 400
+    assert "no se resetea desde aquí" in response.text
+    assert "temp-password-banner" not in response.text
+    db_session.refresh(admin_user)
+    assert admin_user.password_hash == old_hash
+    assert admin_user.must_change_password is False
+
+
+def test_inactive_operario_password_cannot_be_reset(
+    admin_client: TestClient, inactive_user: User, db_session: Session
+) -> None:
+    """EARS-H3-05"""
+    response = _reset(admin_client, inactive_user)
+
+    assert response.status_code == 400
+    assert "Reactiva la cuenta" in response.text
+    assert "temp-password-banner" not in response.text
+    db_session.refresh(inactive_user)
+    assert inactive_user.must_change_password is False
+
+
+def test_reset_unknown_user_returns_404(admin_client: TestClient) -> None:
+    response = admin_client.post("/users/9999/reset-password")
+
+    assert response.status_code == 404

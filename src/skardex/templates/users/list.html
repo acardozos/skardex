@@ -16,6 +16,13 @@
     {% if error %}
     <p class="k-banner">{{ error }}</p>
     {% endif %}
+    {% if temp_password %}
+    <div class="k-banner k-banner--ok" id="temp-password-banner">
+        <p style="margin:0 0 6px">Contraseña temporal de <strong>{{ reset_username }}</strong>:</p>
+        <p style="margin:0 0 6px"><code style="font-size:20px;letter-spacing:.1em;font-weight:600">{{ temp_password }}</code></p>
+        <p style="margin:0" class="k-dim">Cópiala y compártela ahora: no se volverá a mostrar. Sirve solo para el próximo ingreso, y esa persona deberá definir una contraseña propia.</p>
+    </div>
+    {% endif %}
 
     <div class="k-card">
         <table class="k-table">
@@ -38,6 +45,10 @@
                             {% if u.role == "admin" %}
                             <span class="k-dim">Cuenta del dueño</span>
                             {% elif u.is_active %}
+                            <form method="post" action="/users/{{ u.id }}/reset-password"
+                                  onsubmit="return confirm('¿Resetear la contraseña de {{ u.username }}? Su contraseña actual dejará de servir y se generará una temporal.');">
+                                <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Resetear contraseña</button>
+                            </form>
                             <form method="post" action="/users/{{ u.id }}/deactivate"
                                   onsubmit="return confirm('¿Desactivar a {{ u.username }}? Perderá el acceso de inmediato. Sus movimientos siguen en el historial.');">
                                 <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Desactivar</button>

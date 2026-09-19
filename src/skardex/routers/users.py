@@ -7,16 +7,23 @@ from skardex.models import User
 from skardex.security import require_admin
 from skardex.services.user_service import (
     MIN_PASSWORD_LENGTH,
+    CannotResetOwnPasswordError,
     DuplicateUsernameError,
+    InactiveUserError,
     LastActiveAdminError,
     WeakPasswordError,
     activate_user,
     create_operario,
     deactivate_user,
+    reset_password_to_temporary,
 )
 from skardex.templating import templates
 
 router = APIRouter(prefix="/users")
+
+# One-shot hand-off of a freshly generated temporary password from the reset
+# POST to the redirected GET, so a page reload never repeats the reset.
+TEMP_PASSWORD_SESSION_KEY = "temp_password"
 
 
 def _error_message(exc: Exception) -> str:
@@ -24,6 +31,10 @@ def _error_message(exc: Exception) -> str:
         return "Ya existe un usuario con ese nombre."
     if isinstance(exc, WeakPasswordError):
         return f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres."
+    if isinstance(exc, CannotResetOwnPasswordError):
+        return "La contraseña del admin no se resetea desde aquí."
+    if isinstance(exc, InactiveUserError):
+        return "Reactiva la cuenta antes de resetear su contraseña."
     return "No se puede desactivar la única cuenta admin activa."
 
 
@@ -41,7 +52,18 @@ def list_users(
     db: Session = Depends(get_db),
 ) -> Response:
     users = db.query(User).order_by(User.username).all()
-    return templates.TemplateResponse(request, "users/list.html", {"users": users})
+    context: dict[str, object] = {"users": users}
+    headers: dict[str, str] = {}
+
+    reset = request.session.pop(TEMP_PASSWORD_SESSION_KEY, None)
+    if reset is not None:
+        context["reset_username"] = reset["username"]
+        context["temp_password"] = reset["password"]
+        headers["Cache-Control"] = "no-store"
+
+    return templates.TemplateResponse(
+        request, "users/list.html", context, headers=headers
+    )
 
 
 @router.get("/new")
@@ -104,4 +126,31 @@ def activate_user_route(
 ) -> Response:
     user = _get_user_or_404(db, user_id)
     activate_user(db, user)
+    return RedirectResponse(url="/users", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{user_id}/reset-password")
+def reset_password_route(
+    user_id: int,
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Response:
+    user = _get_user_or_404(db, user_id)
+
+    try:
+        temporary = reset_password_to_temporary(db, user)
+    except (CannotResetOwnPasswordError, InactiveUserError) as exc:
+        users = db.query(User).order_by(User.username).all()
+        return templates.TemplateResponse(
+            request,
+            "users/list.html",
+            {"users": users, "error": _error_message(exc)},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    request.session[TEMP_PASSWORD_SESSION_KEY] = {
+        "username": user.username,
+        "password": temporary,
+    }
     return RedirectResponse(url="/users", status_code=status.HTTP_303_SEE_OTHER)
