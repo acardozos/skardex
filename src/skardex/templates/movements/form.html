@@ -14,13 +14,14 @@
         <p class="k-banner">{{ error }}</p>
         {% endif %}
 
+        {% set chosen_type = form.get("movement_type", "entrada") %}
         <form class="k-form" method="post" action="/movements/new">
             <div class="k-field">
                 <label class="k-label" for="material_id">Material</label>
                 <select class="k-select" id="material_id" name="material_id" required>
-                    <option value="" disabled selected>Selecciona un material</option>
+                    <option value="" disabled {% if not form.get("material_id") %}selected{% endif %}>Selecciona un material</option>
                     {% for material in materials %}
-                    <option value="{{ material.id }}">{{ material.name }} · saldo {{ balances.get(material.id, 0) }} {{ unit_labels.get(material.unit, material.unit) }}</option>
+                    <option value="{{ material.id }}" {% if form.get("material_id") == material.id | string %}selected{% endif %}>{{ material.name }} · saldo {{ balances.get(material.id, 0) }} {{ unit_labels.get(material.unit, material.unit) }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -29,11 +30,11 @@
                 <span class="k-label">Tipo de movimiento</span>
                 <div class="k-seg" style="display:grid;grid-template-columns:1fr 1fr;width:100%">
                     <label class="k-radio">
-                        <input type="radio" name="movement_type" value="entrada" checked>
+                        <input type="radio" name="movement_type" value="entrada" {% if chosen_type != "salida" %}checked{% endif %}>
                         <span class="k-btn k-btn--ghost k-btn--block">Entrada</span>
                     </label>
                     <label class="k-radio">
-                        <input type="radio" name="movement_type" value="salida">
+                        <input type="radio" name="movement_type" value="salida" {% if chosen_type == "salida" %}checked{% endif %}>
                         <span class="k-btn k-btn--ghost k-btn--block">Salida</span>
                     </label>
                 </div>
@@ -42,27 +43,36 @@
             <div class="k-form__row">
                 <div class="k-field">
                     <label class="k-label" for="quantity">Cantidad</label>
-                    <input class="k-input" type="number" step="0.001" min="0" id="quantity" name="quantity" required placeholder="0">
+                    <input class="k-input" type="number" step="0.001" min="0" id="quantity" name="quantity" required placeholder="0" value="{{ form.get('quantity', '') }}">
                 </div>
                 <div class="k-field">
                     <label class="k-label" for="movement_date">Fecha</label>
-                    <input class="k-input" type="date" id="movement_date" name="movement_date" value="{{ today }}" required>
+                    <input class="k-input" type="date" id="movement_date" name="movement_date" value="{{ form.get('movement_date') or today }}" required>
                 </div>
             </div>
 
-            <div class="k-field">
-                <label class="k-label" for="reason">Motivo (solo para salidas)</label>
-                <select class="k-select" id="reason" name="reason">
-                    <option value="">—</option>
-                    {% for key, label in reason_labels.items() %}
-                    <option value="{{ key }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
+            <div class="k-form__row" id="billing-row">
+                <div class="k-field" id="reason-field">
+                    <label class="k-label" for="reason">Motivo de la salida</label>
+                    <select class="k-select" id="reason" name="reason">
+                        <option value="" disabled {% if not form.get("reason") %}selected{% endif %}>Selecciona un motivo</option>
+                        {% for key, label in reason_labels.items() %}
+                        <option value="{{ key }}" {% if form.get("reason") == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if is_admin %}
+                <div class="k-field" id="price-field">
+                    <label class="k-label" for="unit_price">Precio unitario (opcional)</label>
+                    <input class="k-input" type="number" step="0.01" min="0.01" id="unit_price" name="unit_price" placeholder="0,00" value="{{ form.get('unit_price', '') }}">
+                    <span class="k-help">Vacío = precio de referencia del material.</span>
+                </div>
+                {% endif %}
             </div>
 
             <div class="k-field">
                 <label class="k-label" for="note">Observación (opcional)</label>
-                <textarea class="k-textarea" id="note" name="note" rows="2" placeholder="Compra a proveedor, consumo en obra…"></textarea>
+                <textarea class="k-textarea" id="note" name="note" rows="2" placeholder="Compra a proveedor, consumo en obra…">{{ form.get("note", "") }}</textarea>
             </div>
 
             <div class="k-form__actions">
@@ -72,4 +82,33 @@
         </form>
     </div>
 </main>
+
+<script>
+  // Comfort only: the server validates the reason and price either way.
+  // The reason applies to salidas; the price only to sales (admin only).
+  (function () {
+    const form = document.querySelector("form.k-form");
+    const reason = document.getElementById("reason");
+    const reasonField = document.getElementById("reason-field");
+    const price = document.getElementById("unit_price");
+    const priceField = document.getElementById("price-field");
+
+    function show(field, control, visible, required) {
+      field.style.display = visible ? "" : "none";
+      control.disabled = !visible;
+      control.required = visible && required;
+    }
+
+    function sync() {
+      const salida = form.querySelector('input[name="movement_type"]:checked').value === "salida";
+      show(reasonField, reason, salida, true);
+      if (price) {
+        show(priceField, price, salida && reason.value === "venta", false);
+      }
+    }
+
+    form.addEventListener("change", sync);
+    sync();
+  })();
+</script>
 {% endblock %}

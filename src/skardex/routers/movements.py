@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from skardex.clock import today
 from skardex.db import get_db
-from skardex.models import Material, Movement, MovementType, UserRole
+from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.money import InvalidMoneyError, parse_money
 from skardex.security import CurrentUser
 from skardex.services.billing_service import InvalidPriceError, InvalidReasonError
@@ -85,23 +86,39 @@ def list_movements(
     )
 
 
+def _form_response(
+    request: Request,
+    user: User,
+    db: Session,
+    *,
+    error: str | None = None,
+    form: dict[str, str] | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> Response:
+    """Render the movement form; `form` holds what the user already typed so an
+    error never makes them start over."""
+    return templates.TemplateResponse(
+        request,
+        "movements/form.html",
+        {
+            "materials": _active_materials(db),
+            "balances": get_balances_for_active_materials(db),
+            "error": error,
+            "today": today().isoformat(),
+            "form": form or {},
+            "is_admin": user.role == UserRole.ADMIN,
+        },
+        status_code=status_code,
+    )
+
+
 @router.get("/new")
 def new_movement_form(
     request: Request,
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> Response:
-    materials = _active_materials(db)
-    return templates.TemplateResponse(
-        request,
-        "movements/form.html",
-        {
-            "materials": materials,
-            "balances": get_balances_for_active_materials(db),
-            "error": None,
-            "today": date_type.today().isoformat(),
-        },
-    )
+    return _form_response(request, user, db)
 
 
 @router.post("/new")
@@ -148,14 +165,19 @@ def create_movement(
         InvalidOperation,
         ValueError,
     ) as exc:
-        return templates.TemplateResponse(
+        return _form_response(
             request,
-            "movements/form.html",
-            {
-                "materials": _active_materials(db),
-                "balances": get_balances_for_active_materials(db),
-                "error": _error_message(exc),
-                "today": date_type.today().isoformat(),
+            user,
+            db,
+            error=_error_message(exc),
+            form={
+                "material_id": str(material_id),
+                "movement_type": movement_type,
+                "quantity": quantity,
+                "movement_date": movement_date,
+                "note": note,
+                "reason": reason,
+                "unit_price": unit_price,
             },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
