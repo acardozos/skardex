@@ -15,6 +15,7 @@ class Material(Base):
     name: Mapped[str] = mapped_column(String(200))
     unit: Mapped[str] = mapped_column(String(20))
     min_stock: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    sale_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

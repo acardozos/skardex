@@ -46,3 +46,16 @@ UNIT_LABELS: dict[str, str] = {
     "docena": "docena",
     "botella": "botella",
 }
+
+SALE_REASON = "venta"
+
+# Why a salida happens. Only sales are charged. Stored as the key; the dict
+# order is the order of the <select> in the movement form.
+MOVEMENT_REASONS = {
+    "venta": "Venta",
+    "consumo_interno": "Consumo interno",
+    "merma": "Merma",
+    "desperdicio": "Desperdicio",
+    "muestra": "Muestra",
+    "otro": "Otro",
+}
