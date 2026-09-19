@@ -10,7 +10,11 @@ from skardex.db import get_db
 from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.money import InvalidMoneyError, parse_money
 from skardex.security import CurrentUser
-from skardex.services.billing_service import InvalidPriceError, InvalidReasonError
+from skardex.services.billing_service import (
+    InvalidPriceError,
+    InvalidReasonError,
+    unpriced_sale_conditions,
+)
 from skardex.services.kardex_service import (
     InactiveMaterialError,
     InsufficientStockError,
@@ -38,6 +42,7 @@ def _error_message(exc: Exception) -> str:
 
 
 _VALID_TYPES = {"entrada", "salida"}
+_VALID_COBROS = {"sin_precio"}
 
 
 def _active_materials(db: Session) -> list[Material]:
@@ -56,6 +61,7 @@ def list_movements(
     db: Session = Depends(get_db),
     material_id: str = "",
     type_filter: str = Query("", alias="type"),
+    cobro: str = "",
 ) -> Response:
     # Query param arrives as "" for the "Todos" option in the filter
     # <select>, which FastAPI can't coerce directly into int | None.
@@ -65,6 +71,8 @@ def list_movements(
         selected_material_id = None
 
     selected_type = type_filter if type_filter in _VALID_TYPES else ""
+    # The only supported value is "sin_precio"; anything else means no filter.
+    selected_cobro = cobro if cobro in _VALID_COBROS else ""
 
     query = db.query(Movement).order_by(
         Movement.movement_date.desc(), Movement.id.desc()
@@ -73,6 +81,8 @@ def list_movements(
         query = query.filter(Movement.material_id == selected_material_id)
     if selected_type:
         query = query.filter(Movement.type == MovementType(selected_type))
+    if selected_cobro:
+        query = query.filter(*unpriced_sale_conditions())
 
     return templates.TemplateResponse(
         request,
@@ -82,6 +92,7 @@ def list_movements(
             "materials": db.query(Material).order_by(Material.name).all(),
             "selected_material_id": selected_material_id,
             "selected_type": selected_type,
+            "selected_cobro": selected_cobro,
         },
     )
 

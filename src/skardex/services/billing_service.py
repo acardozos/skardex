@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import ColumnElement
 from sqlalchemy.orm import Query, Session
 
 from skardex.clock import today
@@ -112,12 +113,17 @@ def list_sales(db: Session, *, estado: str) -> list[Movement]:
     return query.order_by(Movement.movement_date.desc(), Movement.id.desc()).all()
 
 
-def _unpriced_sales_query(db: Session) -> Query[Movement]:
-    return db.query(Movement).filter(
+def unpriced_sale_conditions() -> tuple[ColumnElement[bool], ...]:
+    """The one definition of a "sale without price", shared by every query."""
+    return (
         Movement.type == MovementType.SALIDA,
         Movement.reason == SALE_REASON,
         Movement.unit_price.is_(None),
     )
+
+
+def _unpriced_sales_query(db: Session) -> Query[Movement]:
+    return db.query(Movement).filter(*unpriced_sale_conditions())
 
 
 def list_unpriced_sales(db: Session) -> list[Movement]:

@@ -1,3 +1,4 @@
+import html as html_lib
 from datetime import date
 from decimal import Decimal
 
@@ -531,3 +532,270 @@ def test_the_form_defaults_to_an_entrada_with_todays_date_in_colombia(
     assert 'value="2030-01-02"' in html
     assert 'value="entrada" checked' in html
     assert 'value="salida" checked' not in html
+
+
+# --- history: reason, price, amount and billing status (spec 004, H3) ----
+
+UNPRICED_TAG = '<span class="k-tag">Sin precio</span>'
+
+
+def _history_movement(
+    db: Session,
+    user: User,
+    name: str,
+    *,
+    movement_type: MovementType = MovementType.SALIDA,
+    quantity: str = "1",
+    reason: str | None = "venta",
+    price: str | None = "1000",
+    paid_on: date | None = None,
+) -> Movement:
+    """A movement on its own material, so its row is easy to find in the page."""
+    material = Material(name=name, unit="kg")
+    db.add(material)
+    db.commit()
+    movement = Movement(
+        material_id=material.id,
+        user_id=user.id,
+        type=movement_type,
+        quantity=Decimal(quantity),
+        movement_date=date(2026, 9, 10),
+        reason=reason,
+        unit_price=Decimal(price) if price is not None else None,
+        paid_at=paid_on,
+        paid_by_id=user.id if paid_on else None,
+    )
+    db.add(movement)
+    db.commit()
+    return movement
+
+
+def _table(html: str) -> str:
+    """Only the body of the history table: the material filter <select> lists
+    every material name too, which would make plain substring checks lie."""
+    return html.split("<tbody>")[1].split("</tbody>")[0]
+
+
+def _row(html: str, material_name: str) -> str:
+    """The <tr> of the history table that belongs to the given material."""
+    rows = [chunk for chunk in _table(html).split("<tr>") if material_name in chunk]
+    assert len(rows) == 1, f"expected one row for {material_name!r}, got {len(rows)}"
+    return rows[0].split("</tr>")[0]
+
+
+def test_history_shows_the_reason_of_every_salida(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-01"""
+    for key in MOVEMENT_REASONS:
+        price = "1000" if key == "venta" else None
+        _history_movement(db_session, admin_user, f"Mat {key}", reason=key, price=price)
+    _history_movement(db_session, admin_user, "Mat vieja", reason=None, price=None)
+    _history_movement(
+        db_session,
+        admin_user,
+        "Mat entrada",
+        movement_type=MovementType.ENTRADA,
+        reason=None,
+        price=None,
+    )
+
+    html = admin_client.get("/movements").text
+
+    for key, label in MOVEMENT_REASONS.items():
+        assert f">{label}</td>" in _row(html, f"Mat {key}")
+    assert ">Sin motivo</td>" in _row(html, "Mat vieja")
+    entrada_row = _row(html, "Mat entrada")
+    assert "Sin motivo" not in entrada_row
+    for label in MOVEMENT_REASONS.values():
+        assert f">{label}</td>" not in entrada_row
+
+
+def test_history_shows_price_amount_and_status_only_for_priced_sales(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-02"""
+    _history_movement(db_session, admin_user, "Mat pendiente", quantity="2.5")
+    _history_movement(
+        db_session,
+        admin_user,
+        "Mat pagada",
+        quantity="2",
+        price="500",
+        paid_on=date(2026, 9, 15),
+    )
+    _history_movement(db_session, admin_user, "Mat merma", reason="merma", price=None)
+    _history_movement(
+        db_session,
+        admin_user,
+        "Mat entrada",
+        movement_type=MovementType.ENTRADA,
+        reason=None,
+        price=None,
+    )
+
+    html = admin_client.get("/movements").text
+
+    pending = _row(html, "Mat pendiente")
+    assert "$ 1.000,00" in pending
+    assert "$ 2.500,00" in pending
+    assert ">Pendiente</span>" in pending
+    assert "Pagada" not in pending
+
+    paid = _row(html, "Mat pagada")
+    assert "$ 500,00" in paid
+    assert "$ 1.000,00" in paid
+    assert ">Pagada</span>" in paid
+    assert "15/09/2026" in paid
+    assert "Pendiente" not in paid
+
+    for name in ("Mat merma", "Mat entrada"):
+        row = _row(html, name)
+        assert "$" not in row
+        assert "Pendiente" not in row
+        assert "Pagada" not in row
+
+
+def test_history_amounts_use_the_peso_format_and_round_half_up(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-03, EARS-H3-06 (on screen)"""
+    _history_movement(
+        db_session, admin_user, "Mat grande", quantity="3", price="1234567.5"
+    )
+    _history_movement(db_session, admin_user, "Mat mitad", quantity="0.1", price="0.05")
+
+    html = admin_client.get("/movements").text
+
+    big = _row(html, "Mat grande")
+    assert "$ 1.234.567,50" in big  # unit price
+    assert "$ 3.703.702,50" in big  # amount
+    half = _row(html, "Mat mitad")
+    assert "$ 0,05" in half
+    assert "$ 0,01" in half  # 0.005 rounds half up
+
+
+def test_a_sale_without_price_is_marked_and_has_no_amount(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-04"""
+    _history_movement(db_session, admin_user, "Mat sin precio", price=None)
+
+    row = _row(admin_client.get("/movements").text, "Mat sin precio")
+
+    assert UNPRICED_TAG in row
+    assert "$" not in row
+    assert "Pendiente" not in row
+
+
+def test_an_operario_sees_prices_amounts_and_status_too(
+    operario_client: TestClient, operario_user: User, db_session: Session
+) -> None:
+    """EARS-H3-02"""
+    _history_movement(db_session, operario_user, "Mat visible", quantity="2")
+
+    row = _row(operario_client.get("/movements").text, "Mat visible")
+
+    assert "$ 2.000,00" in row
+    assert ">Pendiente</span>" in row
+
+
+def _unpriced_setup(db: Session, user: User) -> None:
+    _history_movement(db, user, "Mat sin precio", price=None)
+    _history_movement(db, user, "Mat con precio")
+    _history_movement(db, user, "Mat merma", reason="merma", price=None)
+    _history_movement(db, user, "Mat vieja", reason=None, price=None)
+    _history_movement(
+        db,
+        user,
+        "Mat entrada",
+        movement_type=MovementType.ENTRADA,
+        reason=None,
+        price=None,
+    )
+
+
+def test_filter_shows_only_sales_without_a_price(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-05"""
+    _unpriced_setup(db_session, admin_user)
+
+    table = _table(admin_client.get("/movements?cobro=sin_precio").text)
+
+    assert "Mat sin precio" in table
+    for other in ("Mat con precio", "Mat merma", "Mat vieja", "Mat entrada"):
+        assert other not in table
+
+
+def test_filter_combines_with_material_and_type(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-05"""
+    _unpriced_setup(db_session, admin_user)
+    _history_movement(db_session, admin_user, "Mat otra sin precio", price=None)
+    wanted = db_session.query(Material).filter(Material.name == "Mat sin precio").one()
+
+    by_material = _table(
+        admin_client.get(f"/movements?cobro=sin_precio&material_id={wanted.id}").text
+    )
+    assert "Mat sin precio" in by_material
+    assert "Mat otra sin precio" not in by_material
+
+    by_type = _table(admin_client.get("/movements?cobro=sin_precio&type=salida").text)
+    assert "Mat sin precio" in by_type
+    assert "Mat otra sin precio" in by_type
+
+    entradas_page = admin_client.get("/movements?cobro=sin_precio&type=entrada").text
+    assert "Mat sin precio" not in _table(entradas_page)
+    assert "Sin resultados" in entradas_page
+
+
+def test_an_unknown_cobro_value_is_ignored(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H3-05"""
+    _unpriced_setup(db_session, admin_user)
+
+    table = _table(admin_client.get("/movements?cobro=cualquiera").text)
+
+    assert "Mat sin precio" in table
+    assert "Mat con precio" in table
+    assert "Mat entrada" in table
+
+
+def test_an_operario_can_use_the_filter_too(
+    operario_client: TestClient, operario_user: User, db_session: Session
+) -> None:
+    """EARS-H3-05: no role restriction"""
+    _unpriced_setup(db_session, operario_user)
+
+    page = operario_client.get("/movements").text
+    filtered = operario_client.get("/movements?cobro=sin_precio").text
+
+    assert "cobro=sin_precio" in page
+    assert "Mat sin precio" in _table(filtered)
+    assert "Mat con precio" not in _table(filtered)
+
+
+def test_the_filters_keep_each_other_when_switching(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """Switching the type keeps the price filter, and toggling it keeps the type.
+
+    The page is unescaped first: a query string built from a variable comes out
+    as `&amp;`, which is the correct HTML and is what a browser decodes."""
+    _unpriced_setup(db_session, admin_user)
+
+    active = html_lib.unescape(
+        admin_client.get("/movements?cobro=sin_precio&type=salida").text
+    )
+    assert "/movements?type=entrada&cobro=sin_precio" in active
+    assert "/movements?type=salida&cobro=sin_precio" in active
+    # the toggle is active, so its link removes the filter and keeps the type
+    assert 'href="/movements?type=salida">Ventas sin precio' in active
+
+    inactive = html_lib.unescape(admin_client.get("/movements?type=salida").text)
+    assert (
+        'href="/movements?type=salida&cobro=sin_precio">Ventas sin precio' in inactive
+    )

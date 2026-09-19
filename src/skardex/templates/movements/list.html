@@ -13,9 +13,12 @@
         <a class="k-btn k-btn--primary" href="/movements/new">Registrar movimiento</a>
     </div>
 
+    {% set keep_material = ("&material_id=" ~ selected_material_id) if selected_material_id else "" %}
+    {% set keep_cobro = "&cobro=sin_precio" if selected_cobro else "" %}
     <div class="k-toolbar">
         <form method="get" action="/movements">
             <input type="hidden" name="type" value="{{ selected_type }}">
+            <input type="hidden" name="cobro" value="{{ selected_cobro }}">
             <select class="k-select" name="material_id" onchange="this.form.submit()">
                 <option value="">Todos los materiales</option>
                 {% for material in materials %}
@@ -24,9 +27,12 @@
             </select>
         </form>
         <nav class="k-seg">
-            <a class="{% if not selected_type %}is-active{% endif %}" href="/movements{% if selected_material_id %}?material_id={{ selected_material_id }}{% endif %}">Todos</a>
-            <a class="{% if selected_type == 'entrada' %}is-active{% endif %}" href="/movements?type=entrada{% if selected_material_id %}&material_id={{ selected_material_id }}{% endif %}">Entradas</a>
-            <a class="{% if selected_type == 'salida' %}is-active{% endif %}" href="/movements?type=salida{% if selected_material_id %}&material_id={{ selected_material_id }}{% endif %}">Salidas</a>
+            <a class="{% if not selected_type %}is-active{% endif %}" href="/movements?type={{ keep_material }}{{ keep_cobro }}">Todos</a>
+            <a class="{% if selected_type == 'entrada' %}is-active{% endif %}" href="/movements?type=entrada{{ keep_material }}{{ keep_cobro }}">Entradas</a>
+            <a class="{% if selected_type == 'salida' %}is-active{% endif %}" href="/movements?type=salida{{ keep_material }}{{ keep_cobro }}">Salidas</a>
+        </nav>
+        <nav class="k-seg">
+            <a class="{% if selected_cobro %}is-active{% endif %}" href="/movements?type={{ selected_type }}{{ keep_material }}{% if not selected_cobro %}&cobro=sin_precio{% endif %}">Ventas sin precio</a>
         </nav>
     </div>
 
@@ -38,6 +44,10 @@
                     <th>Material</th>
                     <th>Tipo</th>
                     <th class="k-num">Cantidad</th>
+                    <th>Motivo</th>
+                    <th class="k-num">Precio unit.</th>
+                    <th class="k-num">Monto</th>
+                    <th>Cobro</th>
                     <th>Usuario</th>
                     <th>Observación</th>
                 </tr>
@@ -49,6 +59,26 @@
                     <td data-label="Material" class="k-strong">{{ movement.material.name }}</td>
                     <td data-label="Tipo"><span class="k-tag{{ ' k-tag--ok' if movement.type == 'entrada' else '' }}">{{ "Entrada" if movement.type == "entrada" else "Salida" }}</span></td>
                     <td data-label="Cantidad" class="k-num">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</td>
+                    <td data-label="Motivo" class="k-dim">
+                        {%- if movement.type == "entrada" -%}-
+                        {%- elif movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
+                        {%- else -%}Sin motivo{%- endif -%}
+                    </td>
+                    {% if movement.reason == "venta" and movement.unit_price is none %}
+                    <td data-label="Precio unit." class="k-num"><span class="k-tag">Sin precio</span></td>
+                    <td data-label="Monto" class="k-num k-dim">-</td>
+                    <td data-label="Cobro" class="k-dim">-</td>
+                    {% elif movement.reason == "venta" %}
+                    <td data-label="Precio unit." class="k-num">{{ movement.unit_price | cop }}</td>
+                    <td data-label="Monto" class="k-num k-strong">{{ movement.amount | cop }}</td>
+                    <td data-label="Cobro">
+                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
+                    </td>
+                    {% else %}
+                    <td data-label="Precio unit." class="k-num k-dim">-</td>
+                    <td data-label="Monto" class="k-num k-dim">-</td>
+                    <td data-label="Cobro" class="k-dim">-</td>
+                    {% endif %}
                     <td data-label="Usuario" class="k-dim">{{ movement.user.username }}</td>
                     <td data-label="Observación" class="k-dim k-cell--wide">{{ movement.note or "-" }}</td>
                 </tr>
@@ -59,7 +89,7 @@
         {% if not movements %}
         <div class="k-empty">
             <span class="k-empty__icon">🗒️</span>
-            {% if selected_material_id or selected_type %}
+            {% if selected_material_id or selected_type or selected_cobro %}
             <h3>Sin resultados</h3>
             <p>Ningún movimiento coincide con ese filtro.</p>
             {% else %}
