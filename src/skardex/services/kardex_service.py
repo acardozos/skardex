@@ -5,7 +5,8 @@ from decimal import Decimal
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from skardex.models import Material, Movement, MovementType, User
+from skardex.models import Material, Movement, MovementType, User, UserRole
+from skardex.services.billing_service import billing_fields_for
 
 
 @dataclass
@@ -123,6 +124,8 @@ def register_movement(
     quantity: Decimal,
     movement_date: date,
     note: str | None,
+    reason: str | None = None,
+    unit_price: Decimal | None = None,
 ) -> Movement:
     if not material.is_active:
         raise InactiveMaterialError(material.id)
@@ -130,7 +133,17 @@ def register_movement(
     if quantity <= 0:
         raise InvalidQuantityError(quantity)
 
+    # An entrada has no reason or price, even if someone sends them.
+    stored_reason: str | None = None
+    stored_price: Decimal | None = None
+
     if movement_type == MovementType.SALIDA:
+        stored_reason, stored_price = billing_fields_for(
+            material,
+            reason=reason,
+            provided_price=unit_price,
+            price_allowed=user.role == UserRole.ADMIN,
+        )
         current_balance = get_balance(db, material.id)
         if quantity > current_balance:
             raise InsufficientStockError(current_balance)
@@ -142,6 +155,8 @@ def register_movement(
         quantity=quantity,
         movement_date=movement_date,
         note=note,
+        reason=stored_reason,
+        unit_price=stored_price,
     )
     db.add(movement)
     db.commit()

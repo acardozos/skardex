@@ -6,8 +6,10 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from skardex.db import get_db
-from skardex.models import Material, Movement, MovementType
+from skardex.models import Material, Movement, MovementType, UserRole
+from skardex.money import InvalidMoneyError, parse_money
 from skardex.security import CurrentUser
+from skardex.services.billing_service import InvalidPriceError, InvalidReasonError
 from skardex.services.kardex_service import (
     InactiveMaterialError,
     InsufficientStockError,
@@ -27,6 +29,10 @@ def _error_message(exc: Exception) -> str:
         return "La cantidad debe ser un número mayor a cero."
     if isinstance(exc, InactiveMaterialError):
         return "El material seleccionado no es válido."
+    if isinstance(exc, InvalidReasonError):
+        return "Indica el motivo de la salida."
+    if isinstance(exc, InvalidPriceError | InvalidMoneyError):
+        return "El precio debe ser un número mayor a cero."
     return "La fecha ingresada no es válida."
 
 
@@ -108,12 +114,18 @@ def create_movement(
     quantity: str = Form(...),
     movement_date: str = Form(...),
     note: str = Form(""),
+    reason: str = Form(""),
+    unit_price: str = Form(""),
 ) -> Response:
     material = db.get(Material, material_id)
 
     try:
         if material is None:
             raise InactiveMaterialError(material_id)
+
+        # Only the admin can set a price; for anyone else the value is not
+        # even read (the service ignores it as well).
+        parsed_price = parse_money(unit_price) if user.role == UserRole.ADMIN else None
 
         register_movement(
             db,
@@ -123,11 +135,16 @@ def create_movement(
             quantity=Decimal(quantity),
             movement_date=date_type.fromisoformat(movement_date),
             note=note or None,
+            reason=reason or None,
+            unit_price=parsed_price,
         )
     except (
         InsufficientStockError,
         InvalidQuantityError,
         InactiveMaterialError,
+        InvalidReasonError,
+        InvalidPriceError,
+        InvalidMoneyError,
         InvalidOperation,
         ValueError,
     ) as exc:

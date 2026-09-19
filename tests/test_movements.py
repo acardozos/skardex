@@ -70,6 +70,7 @@ def test_register_salida_decreases_balance(
         data={
             "material_id": str(material.id),
             "movement_type": "salida",
+            "reason": "otro",
             "quantity": "4",
             "movement_date": "2026-01-16",
             "note": "",
@@ -89,6 +90,7 @@ def test_register_salida_exceeding_balance_is_rejected(
         data={
             "material_id": str(material.id),
             "movement_type": "salida",
+            "reason": "otro",
             "quantity": "1",
             "movement_date": "2026-01-15",
             "note": "",
@@ -171,6 +173,7 @@ def test_filter_movements_by_type(
         data={
             "material_id": str(material.id),
             "movement_type": "salida",
+            "reason": "otro",
             "quantity": "2",
             "movement_date": "2026-01-16",
             "note": "nota-salida",
