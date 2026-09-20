@@ -53,6 +53,19 @@
     <div class="k-ok"><span class="k-dot"></span> Todos los materiales están sobre su stock mínimo.</div>
     {% endif %}
 
+    {% if unpriced_sales_count > 0 %}
+    <div class="k-alert" id="unpriced-alert">
+        <div class="k-alert__head">
+            <span class="k-alert__icon">💲</span>
+            <div>
+                <p class="k-eyebrow">Atención</p>
+                <p class="k-alert__text">{{ unpriced_sales_count }} venta{{ "s" if unpriced_sales_count != 1 else "" }} sin precio: no {{ "entran" if unpriced_sales_count != 1 else "entra" }} en el pendiente de pago hasta que se {{ "les fije" if unpriced_sales_count != 1 else "le fije" }} el precio.</p>
+            </div>
+        </div>
+        <a class="k-btn k-btn--ghost k-btn--sm" href="/movements?cobro=sin_precio">Ver las ventas sin precio</a>
+    </div>
+    {% endif %}
+
     <div class="k-card">
         <div class="k-card__head">
             <h2 class="k-card__title">Saldos por material</h2>
