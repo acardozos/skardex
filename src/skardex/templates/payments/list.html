@@ -67,6 +67,7 @@
                     <th>Pago</th>
                     {% endif %}
                     <th>Observación</th>
+                    {% if user.role == "admin" %}<th></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -86,6 +87,9 @@
                     </td>
                     {% endif %}
                     <td data-label="Observación" class="k-dim k-cell--wide">{{ sale.note or "-" }}</td>
+                    {% if user.role == "admin" %}
+                    <td data-label="Acciones"><a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next=/payments">Corregir cobro</a></td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
@@ -137,6 +141,7 @@
                     <th>Material</th>
                     <th class="k-num">Cantidad</th>
                     <th>Observación</th>
+                    {% if user.role == "admin" %}<th></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -146,6 +151,9 @@
                     <td data-label="Material" class="k-strong">{{ sale.material.name }}</td>
                     <td data-label="Cantidad" class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
                     <td data-label="Observación" class="k-dim k-cell--wide">{{ sale.note or "-" }}</td>
+                    {% if user.role == "admin" %}
+                    <td data-label="Acciones"><a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next=/payments">Corregir cobro</a></td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>

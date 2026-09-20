@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Corregir cobro — Simple Kardex{% endblock %}
+
+{% block content %}
+<main class="k-main">
+    <div class="k-formcard">
+        <div style="margin-bottom:20px">
+            <p class="k-eyebrow">Cobro</p>
+            <h1 style="font-size:22px">Corregir cobro</h1>
+        </div>
+
+        {% if error %}
+        <p class="k-banner">{{ error }}</p>
+        {% endif %}
+
+        <div class="k-card" style="margin-bottom:20px">
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;padding:16px 20px">
+                <span class="k-label">Fecha</span><span>{{ movement.movement_date.strftime('%d/%m/%Y') }}</span>
+                <span class="k-label">Material</span><span class="k-strong">{{ movement.material.name }}</span>
+                <span class="k-label">Cantidad</span><span>{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
+                <span class="k-label">Registrada por</span><span>{{ movement.user.username }}</span>
+                <span class="k-label">Estado</span>
+                <span id="billing-state">
+                    {%- if not movement.reason -%}Sin motivo (anterior a esta función)
+                    {%- elif movement.reason != "venta" -%}No se cobra ({{ reason_labels.get(movement.reason, movement.reason) }})
+                    {%- elif movement.unit_price is none -%}Venta sin precio
+                    {%- elif movement.paid_at -%}Pagada el {{ movement.paid_at.strftime('%d/%m/%Y') }}{% if movement.paid_by %} (la registró {{ movement.paid_by.username }}){% endif %}
+                    {%- else -%}Pendiente de pago
+                    {%- endif -%}
+                </span>
+                {% if movement.unit_price is not none %}
+                <span class="k-label">Precio y monto</span><span>{{ movement.unit_price | cop }} → <strong>{{ movement.amount | cop }}</strong></span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if movement.paid_at %}
+        <p class="k-note" style="margin-bottom:16px">Esta venta ya está pagada, así que su precio y su motivo no se pueden cambiar. Si el pago se marcó por error o hay que corregir el monto, primero deshaz el pago.</p>
+        <div class="k-form__actions">
+            <form method="post" action="/movements/{{ movement.id }}/undo-payment"
+                  onsubmit="return confirm('¿Deshacer el pago de esta venta? Volverá a figurar como pendiente.');">
+                <input type="hidden" name="next" value="{{ return_page }}">
+                <button type="submit" class="k-btn k-btn--primary">Deshacer pago</button>
+            </form>
+            <a class="k-btn k-btn--ghost" href="{{ return_page }}">Volver</a>
+        </div>
+        {% else %}
+        <form class="k-form" method="post" action="/movements/{{ movement.id }}/billing">
+            <input type="hidden" name="next" value="{{ return_page }}">
+            <div class="k-field">
+                <label class="k-label" for="reason">Motivo de la salida</label>
+                <select class="k-select" id="reason" name="reason" required>
+                    <option value="" disabled {% if not form.get("reason") %}selected{% endif %}>Selecciona un motivo</option>
+                    {% for key, label in reason_labels.items() %}
+                    <option value="{{ key }}" {% if form.get("reason") == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="k-field" id="price-field">
+                <label class="k-label" for="unit_price">Precio unitario</label>
+                <input class="k-input" type="number" step="0.01" min="0.01" id="unit_price" name="unit_price" placeholder="0,00" value="{{ form.get('unit_price', '') }}">
+                <span class="k-help" id="reference-info">
+                    {%- if reference_price is not none -%}
+                    Precio de referencia del material: {{ reference_price | cop }} por {{ unit_labels.get(movement.material.unit, movement.material.unit) }}. Si lo dejas vacío se usa ese.
+                    {%- else -%}
+                    El material no tiene precio de referencia: si lo dejas vacío, la venta queda sin precio.
+                    {%- endif -%}
+                </span>
+            </div>
+            <div class="k-form__actions">
+                <button type="submit" class="k-btn k-btn--primary">Guardar</button>
+                <a class="k-btn k-btn--ghost" href="{{ return_page }}">Cancelar</a>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</main>
+
+{% if not movement.paid_at %}
+<script>
+  // Comfort only: the price applies to sales; the server ignores it otherwise.
+  (function () {
+    const reason = document.getElementById("reason");
+    const field = document.getElementById("price-field");
+    const price = document.getElementById("unit_price");
+    function sync() {
+      const sale = reason.value === "venta";
+      field.style.display = sale ? "" : "none";
+      price.disabled = !sale;
+    }
+    reason.addEventListener("change", sync);
+    sync();
+  })();
+</script>
+{% endif %}
+{% endblock %}

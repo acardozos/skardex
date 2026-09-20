@@ -1,7 +1,16 @@
 from datetime import date as date_type
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, Form, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -9,11 +18,15 @@ from skardex.clock import today
 from skardex.db import get_db
 from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.money import InvalidMoneyError, parse_money
-from skardex.security import CurrentUser
+from skardex.security import CurrentUser, require_admin
 from skardex.services.billing_service import (
     InvalidPriceError,
     InvalidReasonError,
+    NotPaidError,
+    PaidMovementError,
+    undo_payment,
     unpriced_sale_conditions,
+    update_billing,
 )
 from skardex.services.kardex_service import (
     InactiveMaterialError,
@@ -38,6 +51,13 @@ def _error_message(exc: Exception) -> str:
         return "Indica el motivo de la salida."
     if isinstance(exc, InvalidPriceError | InvalidMoneyError):
         return "El precio debe ser un número mayor a cero."
+    if isinstance(exc, PaidMovementError):
+        return (
+            "Esta venta ya está pagada: deshaz el pago antes de cambiar su "
+            "precio o su motivo."
+        )
+    if isinstance(exc, NotPaidError):
+        return "Esta venta no estaba pagada."
     return "La fecha ingresada no es válida."
 
 
@@ -194,3 +214,129 @@ def create_movement(
         )
 
     return RedirectResponse(url="/movements", status_code=status.HTTP_303_SEE_OTHER)
+
+
+# --- billing correction (admin only) -------------------------------------
+
+# Where to go back to after a correction. A fixed list, never the raw value:
+# redirecting to whatever a query string says would be an open redirect.
+_BILLING_RETURN_PAGES = {"/movements", "/payments"}
+
+
+def _safe_return_page(value: str) -> str:
+    return value if value in _BILLING_RETURN_PAGES else "/movements"
+
+
+def _salida_or_404(db: Session, movement_id: int) -> Movement:
+    """Only a salida has billing; an entrada is treated as if it did not exist."""
+    movement = db.get(Movement, movement_id)
+    if movement is None or movement.type != MovementType.SALIDA:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return movement
+
+
+def _billing_response(
+    request: Request,
+    movement: Movement,
+    *,
+    return_page: str,
+    error: str | None = None,
+    form: dict[str, str] | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> Response:
+    reference = movement.material.sale_price
+    return templates.TemplateResponse(
+        request,
+        "movements/billing.html",
+        {
+            "movement": movement,
+            "error": error,
+            "form": form
+            or {
+                "reason": movement.reason or "",
+                "unit_price": (
+                    str(movement.unit_price) if movement.unit_price is not None else ""
+                ),
+            },
+            "reference_price": reference if reference and reference > 0 else None,
+            "return_page": return_page,
+        },
+        status_code=status_code,
+    )
+
+
+@router.get("/{movement_id}/billing")
+def billing_form(
+    movement_id: int,
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    return_page: str = Query("", alias="next"),
+) -> Response:
+    movement = _salida_or_404(db, movement_id)
+    return _billing_response(
+        request, movement, return_page=_safe_return_page(return_page)
+    )
+
+
+@router.post("/{movement_id}/billing")
+def update_movement_billing(
+    movement_id: int,
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    reason: str = Form(""),
+    unit_price: str = Form(""),
+    return_page: str = Form("", alias="next"),
+) -> Response:
+    movement = _salida_or_404(db, movement_id)
+    destination = _safe_return_page(return_page)
+
+    try:
+        update_billing(
+            db,
+            movement,
+            reason=reason or None,
+            provided_price=parse_money(unit_price),
+        )
+    except (
+        InvalidReasonError,
+        InvalidPriceError,
+        InvalidMoneyError,
+        PaidMovementError,
+    ) as exc:
+        return _billing_response(
+            request,
+            movement,
+            return_page=destination,
+            error=_error_message(exc),
+            form={"reason": reason, "unit_price": unit_price},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return RedirectResponse(url=destination, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/{movement_id}/undo-payment")
+def undo_movement_payment(
+    movement_id: int,
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+    return_page: str = Form("", alias="next"),
+) -> Response:
+    movement = _salida_or_404(db, movement_id)
+    destination = _safe_return_page(return_page)
+
+    try:
+        undo_payment(db, movement)
+    except NotPaidError as exc:
+        return _billing_response(
+            request,
+            movement,
+            return_page=destination,
+            error=_error_message(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    return RedirectResponse(url=destination, status_code=status.HTTP_303_SEE_OTHER)

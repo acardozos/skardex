@@ -15,6 +15,7 @@
 
     {% set keep_material = ("&material_id=" ~ selected_material_id) if selected_material_id else "" %}
     {% set keep_cobro = "&cobro=sin_precio" if selected_cobro else "" %}
+    {% set is_admin = request.session.get("role") == "admin" %}
     <div class="k-toolbar">
         <form method="get" action="/movements">
             <input type="hidden" name="type" value="{{ selected_type }}">
@@ -54,6 +55,7 @@
             </thead>
             <tbody>
                 {% for movement in movements %}
+                {% set fix_link %}{% if is_admin and movement.type == "salida" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing">Corregir cobro</a>{% endif %}{% endset %}
                 <tr>
                     <td data-label="Fecha" class="k-dim">{{ movement.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td data-label="Material" class="k-strong">{{ movement.material.name }}</td>
@@ -67,17 +69,17 @@
                     {% if movement.reason == "venta" and movement.unit_price is none %}
                     <td data-label="Precio unit." class="k-num"><span class="k-tag">Sin precio</span></td>
                     <td data-label="Monto" class="k-num k-dim">-</td>
-                    <td data-label="Cobro" class="k-dim">-</td>
+                    <td data-label="Cobro" class="k-dim">{{ fix_link or "-" }}</td>
                     {% elif movement.reason == "venta" %}
                     <td data-label="Precio unit." class="k-num">{{ movement.unit_price | cop }}</td>
                     <td data-label="Monto" class="k-num k-strong">{{ movement.amount | cop }}</td>
                     <td data-label="Cobro">
-                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
+                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %} {{ fix_link }}
                     </td>
                     {% else %}
                     <td data-label="Precio unit." class="k-num k-dim">-</td>
                     <td data-label="Monto" class="k-num k-dim">-</td>
-                    <td data-label="Cobro" class="k-dim">-</td>
+                    <td data-label="Cobro" class="k-dim">{{ fix_link or "-" }}</td>
                     {% endif %}
                     <td data-label="Usuario" class="k-dim">{{ movement.user.username }}</td>
                     <td data-label="Observación" class="k-dim k-cell--wide">{{ movement.note or "-" }}</td>
