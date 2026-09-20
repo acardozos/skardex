@@ -21,7 +21,8 @@
                 <select class="k-select" id="material_id" name="material_id" required>
                     <option value="" disabled {% if not form.get("material_id") %}selected{% endif %}>Selecciona un material</option>
                     {% for material in materials %}
-                    <option value="{{ material.id }}" {% if form.get("material_id") == material.id | string %}selected{% endif %}>{{ material.name }} · saldo {{ balances.get(material.id, 0) }} {{ unit_labels.get(material.unit, material.unit) }}</option>
+                    {% set ref = material.sale_price if (material.sale_price is not none and material.sale_price > 0) else none %}
+                    <option value="{{ material.id }}" data-price="{{ ref if ref is not none else '' }}" data-price-label="{{ (ref | cop) if ref is not none else '' }}" data-unit="{{ unit_labels.get(material.unit, material.unit) }}" {% if form.get("material_id") == material.id | string %}selected{% endif %}>{{ material.name }} · saldo {{ balances.get(material.id, 0) }} {{ unit_labels.get(material.unit, material.unit) }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -65,10 +66,11 @@
                 <div class="k-field" id="price-field">
                     <label class="k-label" for="unit_price">Precio unitario (opcional)</label>
                     <input class="k-input" type="number" step="0.01" min="0.01" id="unit_price" name="unit_price" placeholder="0,00" value="{{ form.get('unit_price', '') }}">
-                    <span class="k-help">Vacío = precio de referencia del material.</span>
+                    <span class="k-help">Se rellena con el precio de referencia; puedes cambiarlo (por ejemplo, con un descuento).</span>
                 </div>
                 {% endif %}
             </div>
+            <p class="k-note" id="price-info" data-admin="{{ 1 if is_admin else 0 }}" style="display:none;margin:-6px 0 0"></p>
 
             <div class="k-field">
                 <label class="k-label" for="note">Observación (opcional)</label>
@@ -88,10 +90,16 @@
   // The reason applies to salidas; the price only to sales (admin only).
   (function () {
     const form = document.querySelector("form.k-form");
+    const material = document.getElementById("material_id");
     const reason = document.getElementById("reason");
     const reasonField = document.getElementById("reason-field");
     const price = document.getElementById("unit_price");
     const priceField = document.getElementById("price-field");
+    const info = document.getElementById("price-info");
+    const admin = info.dataset.admin === "1";
+    // Once the admin types a price it is theirs: changing the material or the
+    // reason must not overwrite it with the reference price.
+    let priceEdited = price !== null && price.value !== "";
 
     function show(field, control, visible, required) {
       field.style.display = visible ? "" : "none";
@@ -99,15 +107,44 @@
       control.required = visible && required;
     }
 
-    function sync() {
+    function reference() {
+      const option = material.options[material.selectedIndex];
+      if (!material.value || !option) return null;
+      return { price: option.dataset.price || "", label: option.dataset.priceLabel || "", unit: option.dataset.unit || "" };
+    }
+
+    function sync(event) {
       const salida = form.querySelector('input[name="movement_type"]:checked').value === "salida";
+      const venta = salida && reason.value === "venta";
       show(reasonField, reason, salida, true);
       if (price) {
-        show(priceField, price, salida && reason.value === "venta", false);
+        show(priceField, price, venta, false);
+      }
+
+      const ref = venta ? reference() : null;
+      if (ref === null) {
+        info.style.display = "none";
+      } else {
+        if (ref.price) {
+          info.textContent = "Precio de referencia: " + ref.label + " por " + ref.unit + "." + (admin ? " Puedes cambiarlo." : "");
+        } else if (admin) {
+          info.textContent = "Este material no tiene precio de referencia: indica el precio, o la venta quedará sin precio.";
+        } else {
+          info.textContent = "Este material no tiene precio de referencia: la venta se registrará sin precio y el administrador la completará.";
+        }
+        info.style.display = "";
+        // Prefill only when the material or the reason changed, not when the
+        // admin just edited (or cleared) the price field itself.
+        if (price && !priceEdited && !(event && event.target === price)) {
+          price.value = ref.price;
+        }
       }
     }
 
     form.addEventListener("change", sync);
+    if (price) {
+      price.addEventListener("input", () => { priceEdited = price.value !== ""; });
+    }
     sync();
   })();
 </script>

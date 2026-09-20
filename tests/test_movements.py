@@ -1,4 +1,5 @@
 import html as html_lib
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -512,8 +513,8 @@ def test_an_error_keeps_everything_the_user_typed(
     html = response.text
 
     assert response.status_code == 400
-    assert f'<option value="{material.id}" selected>' in html
-    assert f'<option value="{other.id}" selected>' not in html
+    assert re.search(rf'<option value="{material.id}"[^>]*\sselected>', html)
+    assert not re.search(rf'<option value="{other.id}"[^>]*\sselected>', html)
     assert 'value="999"' in html
     assert 'value="2026-08-07"' in html
     assert ">para el taller de Juan</textarea>" in html
@@ -799,3 +800,56 @@ def test_the_filters_keep_each_other_when_switching(
     assert (
         'href="/movements?type=salida&cobro=sin_precio">Ventas sin precio' in inactive
     )
+
+
+# --- reference price shown while registering a sale ----------------------
+
+
+def _option(html: str, material: Material) -> str:
+    match = re.search(rf'<option value="{material.id}"[^>]*>', html)
+    assert match is not None
+    return match.group(0)
+
+
+@pytest.mark.parametrize("client_name", ["admin_client", "operario_client"])
+def test_each_material_option_carries_its_reference_price(
+    request: pytest.FixtureRequest, db_session: Session, client_name: str
+) -> None:
+    """EARS-H2-15: the data the page needs to show the reference price"""
+    client: TestClient = request.getfixturevalue(client_name)
+    priced = _priced_material(db_session, "1234567.5")
+    unpriced = _priced_material(db_session, None)
+    weird = _priced_material(db_session, "0")  # a non-positive price counts as none
+
+    html = client.get("/movements/new").text
+
+    assert 'data-price="1234567.50"' in _option(html, priced)
+    assert 'data-price-label="$ 1.234.567,50"' in _option(html, priced)
+    assert 'data-unit="kg"' in _option(html, priced)
+    for material in (unpriced, weird):
+        assert 'data-price=""' in _option(html, material)
+        assert 'data-price-label=""' in _option(html, material)
+
+
+@pytest.mark.parametrize(
+    ("client_name", "flag"), [("admin_client", "1"), ("operario_client", "0")]
+)
+def test_both_roles_get_the_price_info_line_but_only_the_admin_gets_the_field(
+    request: pytest.FixtureRequest, client_name: str, flag: str
+) -> None:
+    """EARS-H2-15, EARS-H2-04"""
+    client: TestClient = request.getfixturevalue(client_name)
+
+    html = client.get("/movements/new").text
+
+    assert f'id="price-info" data-admin="{flag}"' in html
+    assert ('name="unit_price"' in html) is (flag == "1")
+
+
+def test_the_admin_price_field_explains_that_it_is_prefilled(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H2-16"""
+    html = admin_client.get("/movements/new").text
+
+    assert "Se rellena con el precio de referencia" in html

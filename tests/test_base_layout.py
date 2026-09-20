@@ -97,7 +97,7 @@ def test_nav_links_to_pending_payments_for_both_roles_and_marks_it_active(
     """EARS-H4-01"""
     for client in (admin_client, operario_client):
         elsewhere = client.get("/materials").text
-        assert 'href="/payments">Pendiente de pago</a>' in elsewhere
+        assert 'href="/payments">Pagos</a>' in elsewhere
         assert 'is-active" href="/payments"' not in elsewhere
 
         on_payments = client.get("/payments").text
