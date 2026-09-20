@@ -245,20 +245,28 @@ def _billing_response(
     status_code: int = status.HTTP_200_OK,
 ) -> Response:
     reference = movement.material.sale_price
+    reference_price = reference if reference and reference > 0 else None
+
+    if form is None:
+        # What you see is what gets saved: the current price if there is one,
+        # otherwise the material's reference price (the same value that leaving
+        # the field empty would apply), so a careless save is not a blind one.
+        if movement.unit_price is not None:
+            price_text = str(movement.unit_price)
+        elif reference_price is not None:
+            price_text = str(reference_price)
+        else:
+            price_text = ""
+        form = {"reason": movement.reason or "", "unit_price": price_text}
+
     return templates.TemplateResponse(
         request,
         "movements/billing.html",
         {
             "movement": movement,
             "error": error,
-            "form": form
-            or {
-                "reason": movement.reason or "",
-                "unit_price": (
-                    str(movement.unit_price) if movement.unit_price is not None else ""
-                ),
-            },
-            "reference_price": reference if reference and reference > 0 else None,
+            "form": form,
+            "reference_price": reference_price,
             "return_page": return_page,
         },
         status_code=status_code,

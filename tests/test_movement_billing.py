@@ -534,3 +534,111 @@ def test_payments_offers_the_correction_and_returns_to_payments(
 
     assert f'href="/movements/{priced.id}/billing?next=/payments"' in html
     assert f'href="/movements/{unpriced.id}/billing?next=/payments"' in html
+
+
+# --- the correction form prefills the reference price --------------------
+
+
+def _price_input_value(html: str) -> str:
+    match = re.search(r'<input[^>]*id="unit_price"[^>]*value="([^"]*)"', html)
+    assert match is not None
+    return match.group(1)
+
+
+def test_an_unpriced_sale_opens_with_the_reference_price_already_in_the_field(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H6-11: what you see is what gets saved"""
+    material = _material(db_session, "Con referencia", "1000")
+    sale = make_sale(user=admin_user, material=material, price=None)
+
+    html = admin_client.get(f"/movements/{sale.id}/billing").text
+
+    assert _price_input_value(html) == "1000.00"
+    assert "Precio de referencia del material: $ 1.000,00 por kg" in html
+
+
+def test_saving_the_prefilled_form_prices_the_sale_with_the_reference(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H6-11, EARS-H6-02"""
+    material = _material(db_session, "Con referencia", "1000")
+    sale = make_sale(user=admin_user, material=material, price=None)
+    prefilled = _price_input_value(
+        admin_client.get(f"/movements/{sale.id}/billing").text
+    )
+
+    response = _post(admin_client, sale, "venta", prefilled)
+
+    assert response.status_code == 303
+    db_session.refresh(sale)
+    assert sale.unit_price == Decimal("1000.00")
+
+
+def test_an_old_salida_also_opens_with_the_reference_price(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H6-11: so it is already there when the admin picks Venta"""
+    material = _material(db_session, "Con referencia", "1000")
+    legacy = make_sale(user=admin_user, material=material, reason=None, price=None)
+
+    html = admin_client.get(f"/movements/{legacy.id}/billing").text
+
+    assert _price_input_value(html) == "1000.00"
+
+
+@pytest.mark.parametrize("reference", [None, "0"])
+def test_without_a_usable_reference_price_the_field_stays_empty(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+    reference: str | None,
+) -> None:
+    """EARS-H6-11: no reference, or a non-positive one, means nothing to prefill"""
+    material = _material(db_session, "Sin referencia utilizable", reference)
+    sale = make_sale(user=admin_user, material=material, price=None)
+
+    html = admin_client.get(f"/movements/{sale.id}/billing").text
+
+    assert _price_input_value(html) == ""
+
+
+def test_a_sale_that_already_has_a_price_keeps_its_own_in_the_field(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H6-11: the reference never overwrites a price the sale already has"""
+    material = _material(db_session, "Con referencia", "1000")
+    sale = make_sale(user=admin_user, material=material, price="850")
+
+    html = admin_client.get(f"/movements/{sale.id}/billing").text
+
+    assert _price_input_value(html) == "850.00"
+
+
+def test_after_an_error_the_field_shows_what_the_admin_typed_not_the_reference(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H6-11"""
+    material = _material(db_session, "Con referencia", "1000")
+    sale = make_sale(user=admin_user, material=material, price=None)
+
+    response = _post(admin_client, sale, "venta", "0")
+
+    assert response.status_code == 400
+    assert _price_input_value(response.text) == "0"
