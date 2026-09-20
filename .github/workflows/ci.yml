@@ -7,6 +7,7 @@ on:
 
 jobs:
   test:
+    name: Tests and quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,3 +43,37 @@ jobs:
           SEED_ADMIN_USERNAME: "admin"
           SEED_ADMIN_PASSWORD: "ci-test-password"
           SESSION_HTTPS_ONLY: "false"
+
+  # Render's own auto-deploy cannot see pushes to this repository (the Render
+  # account is tied to a different GitHub identity), so the pipeline asks Render
+  # to deploy instead, and only once every check above has passed. The deploy
+  # hook URL is a secret: it lives in the repository secrets, never in the code.
+  deploy:
+    name: Deploy to Render
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: {}
+    concurrency:
+      group: render-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Trigger the Render deploy for the tested commit
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          set -eu
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "The RENDER_DEPLOY_HOOK_URL secret is not set; nothing was deployed." >&2
+            exit 1
+          fi
+          # Deploy exactly the commit that was just tested. The hook URL already
+          # carries a ?key=..., so `ref` is appended with & (or ? if it did not).
+          case "$RENDER_DEPLOY_HOOK_URL" in
+            *\?*) separator="&" ;;
+            *) separator="?" ;;
+          esac
+          curl --fail --silent --show-error --max-time 30 \
+            --request POST "${RENDER_DEPLOY_HOOK_URL}${separator}ref=${GITHUB_SHA}"
+          echo
+
