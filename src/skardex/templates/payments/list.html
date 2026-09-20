@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Pendiente de pago — Simple Kardex{% endblock %}
+
+{% block content %}
+<main class="k-main">
+    <div class="k-page-head">
+        <div>
+            <p class="k-eyebrow">Cobros</p>
+            <h1>Pendiente de pago</h1>
+            <p>Ventas registradas que todavía no se han pagado. El total es global, no se separa por cliente.</p>
+        </div>
+    </div>
+
+    <div class="k-kpis">
+        <div class="k-kpi">
+            <span class="k-kpi__value">{{ pending_total | cop }}</span>
+            <span class="k-kpi__label">Total pendiente{% if unpriced %} (sin contar las ventas sin precio){% endif %}</span>
+        </div>
+        <div class="k-kpi">
+            <span class="k-kpi__value">{{ pending_count }}</span>
+            <span class="k-kpi__label">Ventas pendientes</span>
+        </div>
+        {% if unpriced %}
+        <div class="k-kpi">
+            <span class="k-kpi__value k-kpi__value--alert">{{ unpriced | length }}</span>
+            <span class="k-kpi__label">Ventas sin precio</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if unpriced %}
+    {% set n = unpriced | length %}
+    <p class="k-banner" id="unpriced-notice">{{ n }} venta{{ "s" if n != 1 else "" }} sin precio no {{ "están incluidas" if n != 1 else "está incluida" }} en el total: hasta que se les fije el precio, el total está incompleto.</p>
+    {% endif %}
+
+    <div class="k-toolbar">
+        <nav class="k-seg">
+            <a class="{% if estado == 'pendientes' %}is-active{% endif %}" href="/payments?estado=pendientes">Pendientes</a>
+            <a class="{% if estado == 'pagados' %}is-active{% endif %}" href="/payments?estado=pagados">Pagados</a>
+            <a class="{% if estado == 'todos' %}is-active{% endif %}" href="/payments?estado=todos">Todos</a>
+        </nav>
+    </div>
+
+    <div class="k-card">
+        <table class="k-table" id="sales-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Material</th>
+                    <th class="k-num">Cantidad</th>
+                    <th class="k-num">Precio unit.</th>
+                    <th class="k-num">Monto</th>
+                    {% if estado != "pendientes" %}
+                    <th>Pago</th>
+                    {% endif %}
+                    <th>Observación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales %}
+                <tr>
+                    <td data-label="Fecha" class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
+                    <td data-label="Material" class="k-strong">{{ sale.material.name }}</td>
+                    <td data-label="Cantidad" class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
+                    <td data-label="Precio unit." class="k-num">{{ sale.unit_price | cop }}</td>
+                    <td data-label="Monto" class="k-num k-strong">{{ sale.amount | cop }}</td>
+                    {% if estado != "pendientes" %}
+                    <td data-label="Pago">
+                        {% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ sale.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
+                    </td>
+                    {% endif %}
+                    <td data-label="Observación" class="k-dim k-cell--wide">{{ sale.note or "-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if not sales %}
+        <div class="k-empty">
+            <span class="k-empty__icon">💰</span>
+            {% if estado == "pagados" %}
+            <h3>Aún no hay ventas pagadas</h3>
+            <p>Cuando se registre un pago, las ventas aparecerán aquí con su fecha de pago.</p>
+            {% elif estado == "todos" %}
+            <h3>Aún no hay ventas con precio</h3>
+            <p>Las ventas registradas con precio aparecerán aquí, pendientes o pagadas.</p>
+            {% else %}
+            <h3>No hay ventas pendientes de pago</h3>
+            <p>Todo lo vendido con precio está pagado.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if unpriced %}
+    <div class="k-card">
+        <div class="k-card__head">
+            <h2 class="k-card__title">Ventas sin precio</h2>
+            <span class="k-card__meta">No suman al total hasta que se les fije el precio</span>
+        </div>
+        <table class="k-table" id="unpriced-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Material</th>
+                    <th class="k-num">Cantidad</th>
+                    <th>Observación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in unpriced %}
+                <tr>
+                    <td data-label="Fecha" class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
+                    <td data-label="Material" class="k-strong">{{ sale.material.name }}</td>
+                    <td data-label="Cantidad" class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
+                    <td data-label="Observación" class="k-dim k-cell--wide">{{ sale.note or "-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</main>
+{% endblock %}

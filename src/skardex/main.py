@@ -8,7 +8,15 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from skardex.config import settings
-from skardex.routers import account, auth, dashboard, materials, movements, users
+from skardex.routers import (
+    account,
+    auth,
+    dashboard,
+    materials,
+    movements,
+    payments,
+    users,
+)
 from skardex.security import NotAuthenticatedError, PasswordChangeRequiredError
 from skardex.templating import templates
 
@@ -36,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router)
     app.include_router(materials.router)
     app.include_router(movements.router)
+    app.include_router(payments.router)
     app.include_router(users.router)
 
     @app.exception_handler(NotAuthenticatedError)

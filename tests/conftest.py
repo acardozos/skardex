@@ -1,4 +1,5 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -9,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from skardex.db import get_db
 from skardex.main import app
-from skardex.models import Base, Material, User, UserRole
+from skardex.models import Base, Material, Movement, MovementType, User, UserRole
 from skardex.security import hash_password
 
 
@@ -129,3 +130,47 @@ def material(db_session: Session) -> Material:
     db_session.commit()
     db_session.refresh(material)
     return material
+
+
+@pytest.fixture
+def make_sale(db_session: Session) -> Callable[..., Movement]:
+    """Factory for salidas with billing data, created directly in the database.
+
+    Each call builds its own material (named after `name`) unless one is given,
+    so a row is easy to find in a rendered page.
+    """
+
+    def _make(
+        name: str = "Material",
+        *,
+        user: User,
+        material: Material | None = None,
+        quantity: str = "1",
+        price: str | None = "1000",
+        reason: str | None = "venta",
+        paid_on: date | None = None,
+        movement_date: date = date(2026, 9, 10),
+        note: str | None = None,
+        movement_type: MovementType = MovementType.SALIDA,
+    ) -> Movement:
+        if material is None:
+            material = Material(name=name, unit="kg")
+            db_session.add(material)
+            db_session.commit()
+        movement = Movement(
+            material_id=material.id,
+            user_id=user.id,
+            type=movement_type,
+            quantity=Decimal(quantity),
+            movement_date=movement_date,
+            note=note,
+            reason=reason,
+            unit_price=Decimal(price) if price is not None else None,
+            paid_at=paid_on,
+            paid_by_id=user.id if paid_on is not None else None,
+        )
+        db_session.add(movement)
+        db_session.commit()
+        return movement
+
+    return _make

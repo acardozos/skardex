@@ -23,6 +23,7 @@
             <a class="k-nav__link{% if request.url.path == '/' %} is-active{% endif %}" href="/">Inicio</a>
             <a class="k-nav__link{% if request.url.path.startswith('/materials') %} is-active{% endif %}" href="/materials">Materiales</a>
             <a class="k-nav__link{% if request.url.path.startswith('/movements') %} is-active{% endif %}" href="/movements">Movimientos</a>
+            <a class="k-nav__link{% if request.url.path.startswith('/payments') %} is-active{% endif %}" href="/payments">Pendiente de pago</a>
             {% if request.session.get("role") == "admin" %}
             <a class="k-nav__link{% if request.url.path.startswith('/users') %} is-active{% endif %}" href="/users">Usuarios</a>
             {% endif %}
@@ -45,6 +46,7 @@
                 <a class="{% if request.url.path == '/' %}is-active{% endif %}" href="/">Inicio</a>
                 <a class="{% if request.url.path.startswith('/materials') %}is-active{% endif %}" href="/materials">Materiales</a>
                 <a class="{% if request.url.path.startswith('/movements') %}is-active{% endif %}" href="/movements">Movimientos</a>
+                <a class="{% if request.url.path.startswith('/payments') %}is-active{% endif %}" href="/payments">Pendiente de pago</a>
                 {% if request.session.get("role") == "admin" %}
                 <a class="{% if request.url.path.startswith('/users') %}is-active{% endif %}" href="/users">Usuarios</a>
                 {% endif %}
