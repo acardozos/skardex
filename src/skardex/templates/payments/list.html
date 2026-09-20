@@ -12,6 +12,13 @@
         </div>
     </div>
 
+    {% if notice %}
+    <p class="k-banner k-banner--ok" id="payment-notice">{{ notice }}</p>
+    {% endif %}
+    {% if error %}
+    <p class="k-banner" id="payment-error">{{ error }}</p>
+    {% endif %}
+
     <div class="k-kpis">
         <div class="k-kpi">
             <span class="k-kpi__value">{{ pending_total | cop }}</span>
@@ -42,10 +49,15 @@
         </nav>
     </div>
 
+    {% set can_pay = user.role == "admin" and estado == "pendientes" and sales %}
+    {% if can_pay %}<form method="post" action="/payments/register" id="payment-form">{% endif %}
     <div class="k-card">
         <table class="k-table" id="sales-table">
             <thead>
                 <tr>
+                    {% if can_pay %}
+                    <th><input type="checkbox" id="select-all" aria-label="Seleccionar todas" {% if selected_ids is none or selected_ids | length == sales | length %}checked{% endif %}></th>
+                    {% endif %}
                     <th>Fecha</th>
                     <th>Material</th>
                     <th class="k-num">Cantidad</th>
@@ -60,6 +72,9 @@
             <tbody>
                 {% for sale in sales %}
                 <tr>
+                    {% if can_pay %}
+                    <td data-label="Cobrar"><input type="checkbox" name="movement_ids" value="{{ sale.id }}" data-amount="{{ sale.amount }}" aria-label="Incluir esta venta en el pago" {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></td>
+                    {% endif %}
                     <td data-label="Fecha" class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td data-label="Material" class="k-strong">{{ sale.material.name }}</td>
                     <td data-label="Cantidad" class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
@@ -75,6 +90,20 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        {% if can_pay %}
+        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;padding:16px 20px;border-top:1px solid var(--border)">
+            <div>
+                <span class="k-label">Seleccionado</span>
+                <div><strong id="selected-total">{{ selected_total | cop }}</strong> <span class="k-dim" id="selected-count">{{ selected_count }} de {{ sales | length }} ventas</span></div>
+            </div>
+            <div class="k-field" style="min-width:180px">
+                <label class="k-label" for="paid_on">Fecha de pago</label>
+                <input class="k-input" type="date" id="paid_on" name="paid_on" value="{{ paid_on or today }}" max="{{ today }}" required>
+            </div>
+            <button type="submit" class="k-btn k-btn--primary">Registrar pago</button>
+        </div>
+        {% endif %}
 
         {% if not sales %}
         <div class="k-empty">
@@ -92,6 +121,8 @@
         </div>
         {% endif %}
     </div>
+
+    {% if can_pay %}</form>{% endif %}
 
     {% if unpriced %}
     <div class="k-card">
@@ -122,4 +153,38 @@
     </div>
     {% endif %}
 </main>
+
+{% if can_pay %}
+<script>
+  // Comfort only: the server recomputes everything from the ids it receives.
+  (function () {
+    const form = document.getElementById("payment-form");
+    const boxes = Array.from(form.querySelectorAll('input[name="movement_ids"]'));
+    const all = document.getElementById("select-all");
+    const total = document.getElementById("selected-total");
+    const count = document.getElementById("selected-count");
+
+    function sync() {
+      const chosen = boxes.filter((box) => box.checked);
+      // Add in whole cents: floating point would drift on money.
+      const cents = chosen.reduce((sum, box) => sum + Math.round(parseFloat(box.dataset.amount) * 100), 0);
+      total.textContent = "$ " + (cents / 100).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      count.textContent = chosen.length + " de " + boxes.length + " ventas";
+      all.checked = chosen.length === boxes.length;
+    }
+
+    all.addEventListener("change", () => {
+      boxes.forEach((box) => { box.checked = all.checked; });
+      sync();
+    });
+    boxes.forEach((box) => box.addEventListener("change", sync));
+    form.addEventListener("submit", (event) => {
+      if (!confirm("¿Registrar el pago de " + count.textContent.split(" de ")[0] + " venta(s) por " + total.textContent + "?")) {
+        event.preventDefault();
+      }
+    });
+    sync();
+  })();
+</script>
+{% endif %}
 {% endblock %}

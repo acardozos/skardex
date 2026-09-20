@@ -1,10 +1,13 @@
 import re
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
+from sqlalchemy.orm import Session
 
+from skardex.clock import today
 from skardex.models import Movement, MovementType, User
 
 MakeSale = Callable[..., Movement]
@@ -263,3 +266,332 @@ def test_the_empty_state_shows_a_zero_total(
 
     assert message in html
     assert '<span class="k-kpi__value">$ 0,00</span>' in html
+
+
+# --- registering a payment by selection (spec 004, H5) -------------------
+
+
+def _register(
+    client: TestClient, ids: list[int], paid_on: str = "2026-09-15"
+) -> Response:
+    return client.post(
+        "/payments/register",
+        data={"movement_ids": [str(i) for i in ids], "paid_on": paid_on},
+        follow_redirects=False,
+    )
+
+
+def _checkboxes(html: str) -> list[str]:
+    """Every per-sale checkbox <input> of the page, whole tag."""
+    return re.findall(r'<input type="checkbox" name="movement_ids"[^>]*>', html)
+
+
+def _shown_ids(html: str) -> list[int]:
+    return [int(i) for i in re.findall(r'name="movement_ids" value="(\d+)"', html)]
+
+
+def test_the_admin_sees_one_checked_box_per_pending_sale_and_the_selected_total(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H5-01"""
+    make_sale("Uno", user=admin_user, price="1000")
+    make_sale("Dos", user=admin_user, price="2500")
+
+    html = admin_client.get("/payments").text
+    boxes = _checkboxes(html)
+
+    assert len(boxes) == 2
+    assert all(" checked" in box for box in boxes)
+    assert 'data-amount="1000.00"' in html
+    assert 'data-amount="2500.00"' in html
+    assert '<strong id="selected-total">$ 3.500,00</strong>' in html
+    assert "2 de 2 ventas" in html
+    assert 'id="select-all"' in html
+
+
+def test_sales_without_a_price_have_no_checkbox(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H5-02"""
+    priced = make_sale("Con precio", user=admin_user)
+    make_sale("Sin precio", user=admin_user, price=None)
+
+    html = admin_client.get("/payments").text
+
+    assert _shown_ids(html) == [priced.id]
+    assert "checkbox" not in _table(html, "unpriced-table")
+
+
+def test_paid_and_all_views_and_an_empty_list_have_no_payment_controls(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H5-01: controls only where there is something to pay"""
+    empty = admin_client.get("/payments").text
+    assert "payment-form" not in empty
+    assert "Registrar pago" not in empty
+
+    make_sale("Cobrada", user=admin_user, paid_on=date(2026, 9, 11))
+    for estado in ("pagados", "todos"):
+        html = admin_client.get(f"/payments?estado={estado}").text
+        assert _checkboxes(html) == []
+        assert "Registrar pago" not in html
+
+
+def test_the_payment_date_defaults_to_today_in_colombia(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """EARS-H5-04"""
+    make_sale("Una", user=admin_user)
+    monkeypatch.setattr("skardex.routers.payments.today", lambda: date(2030, 1, 2))
+
+    html = admin_client.get("/payments").text
+
+    assert 'id="paid_on" name="paid_on" value="2030-01-02"' in html
+    assert 'max="2030-01-02"' in html
+
+
+def test_paying_marks_only_the_selected_sales(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-03, EARS-H5-04 (the date is editable)"""
+    chosen = make_sale("Elegida", user=admin_user)
+    left = make_sale("Dejada", user=admin_user)
+
+    response = _register(admin_client, [chosen.id], paid_on="2026-09-12")
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/payments"
+    db_session.refresh(chosen)
+    db_session.refresh(left)
+    assert chosen.paid_at == date(2026, 9, 12)
+    assert chosen.paid_by_id == admin_user.id
+    assert left.paid_at is None
+    assert left.paid_by_id is None
+
+
+def test_over_http_a_sale_registered_after_the_screen_was_shown_stays_pending(
+    admin_client: TestClient,
+    admin_user: User,
+    operario_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-06: the admin pays what they saw; a later sale is not touched"""
+    make_sale("Vista uno", user=admin_user)
+    make_sale("Vista dos", user=admin_user)
+    shown = _shown_ids(admin_client.get("/payments").text)
+
+    arrived_later = make_sale("Llegó después", user=operario_user)
+
+    response = _register(admin_client, shown)
+
+    assert response.status_code == 303
+    db_session.refresh(arrived_later)
+    assert arrived_later.paid_at is None
+    after = admin_client.get("/payments").text
+    assert "Llegó después" in _table(after, "sales-table")
+    assert "Vista uno" not in _table(after, "sales-table")
+
+
+def test_a_future_date_marks_nothing_and_keeps_the_selection(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-05"""
+    picked = make_sale("Marcada", user=admin_user, price="1000")
+    other = make_sale("Sin marcar", user=admin_user, price="500")
+    tomorrow = (today() + timedelta(days=1)).isoformat()
+
+    response = _register(admin_client, [picked.id], paid_on=tomorrow)
+
+    assert response.status_code == 400
+    assert "La fecha de pago no puede ser futura." in response.text
+    db_session.refresh(picked)
+    db_session.refresh(other)
+    assert picked.paid_at is None
+    assert other.paid_at is None
+    # the form comes back as the admin left it
+    boxes = _checkboxes(response.text)
+    assert [" checked" in box for box in boxes] == [True, False]
+    assert f'value="{tomorrow}"' in response.text
+    assert '<strong id="selected-total">$ 1.000,00</strong>' in response.text
+
+
+def test_an_unreadable_date_is_rejected(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-05"""
+    sale = make_sale("Una", user=admin_user)
+
+    response = _register(admin_client, [sale.id], paid_on="no-es-fecha")
+
+    assert response.status_code == 400
+    assert "La fecha de pago no es válida." in response.text
+    db_session.refresh(sale)
+    assert sale.paid_at is None
+
+
+def test_an_empty_selection_is_rejected_and_nothing_is_ticked_afterwards(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-07"""
+    sale = make_sale("Una", user=admin_user)
+
+    response = _register(admin_client, [])
+
+    assert response.status_code == 400
+    assert "Selecciona al menos una venta" in response.text
+    db_session.refresh(sale)
+    assert sale.paid_at is None
+    assert not any(" checked" in box for box in _checkboxes(response.text))
+
+
+def test_a_selection_with_an_already_paid_sale_marks_nothing(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-08: a stale page, a double submit or another open tab"""
+    stale = make_sale("Ya pagada", user=admin_user)
+    fresh = make_sale("Sigue pendiente", user=admin_user)
+    stale.paid_at = date(2026, 9, 11)
+    stale.paid_by_id = admin_user.id
+    db_session.commit()
+
+    response = _register(admin_client, [stale.id, fresh.id])
+
+    assert response.status_code == 400
+    assert "ya no está pendiente" in response.text
+    db_session.refresh(fresh)
+    assert fresh.paid_at is None
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        pytest.param({"price": None}, id="sale-without-price"),
+        pytest.param({"reason": "merma", "price": None}, id="not-a-sale"),
+        pytest.param({"reason": None, "price": None}, id="old-salida"),
+        pytest.param(
+            {"movement_type": MovementType.ENTRADA, "reason": None, "price": None},
+            id="entrada",
+        ),
+    ],
+)
+def test_only_priced_pending_sales_can_be_paid(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+    kwargs: dict[str, object],
+) -> None:
+    """EARS-H5-08: ids typed by hand for something that cannot be paid"""
+    payable = make_sale("Pagable", user=admin_user)
+    not_payable = make_sale("No pagable", user=admin_user, **kwargs)
+
+    response = _register(admin_client, [payable.id, not_payable.id])
+
+    assert response.status_code == 400
+    db_session.refresh(payable)
+    db_session.refresh(not_payable)
+    assert payable.paid_at is None
+    assert not_payable.paid_at is None
+
+
+def test_an_unknown_id_marks_nothing(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-08"""
+    sale = make_sale("Una", user=admin_user)
+
+    response = _register(admin_client, [sale.id, 987654])
+
+    assert response.status_code == 400
+    db_session.refresh(sale)
+    assert sale.paid_at is None
+
+
+def test_an_operario_cannot_register_a_payment(
+    operario_client: TestClient,
+    operario_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H5-09"""
+    sale = make_sale("Una", user=operario_user)
+
+    response = _register(operario_client, [sale.id])
+
+    assert response.status_code == 403
+    db_session.refresh(sale)
+    assert sale.paid_at is None
+
+
+def test_registering_a_payment_requires_login(client: TestClient) -> None:
+    response = client.post(
+        "/payments/register",
+        data={"movement_ids": ["1"], "paid_on": "2026-09-15"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+
+
+def test_after_paying_the_page_confirms_it_once_and_a_reload_does_not_repeat_it(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """A reload after a payment must neither pay again nor show it forever"""
+    first = make_sale("Una", user=admin_user, price="1000")
+    second = make_sale("Dos", user=admin_user, price="2000")
+    make_sale("Tres", user=admin_user, price="4000")
+
+    landing = admin_client.post(
+        "/payments/register",
+        data={"movement_ids": [str(first.id), str(second.id)], "paid_on": "2026-09-15"},
+    )
+
+    assert landing.status_code == 200  # followed the redirect to /payments
+    assert (
+        "Se registró el pago de 2 ventas por $ 3.000,00 (fecha de pago: 15/09/2026)."
+        in landing.text
+    )
+    assert '<strong id="selected-total">$ 4.000,00</strong>' in landing.text
+
+    reloaded = admin_client.get("/payments").text
+    assert "Se registró el pago" not in reloaded
+    assert db_session.query(Movement).filter(Movement.paid_at.is_not(None)).count() == 2
+
+
+def test_the_confirmation_uses_the_singular_for_one_sale(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    sale = make_sale("Una", user=admin_user, price="1500")
+
+    landing = admin_client.post(
+        "/payments/register",
+        data={"movement_ids": [str(sale.id)], "paid_on": "2026-09-15"},
+    )
+
+    assert "Se registró el pago de 1 venta por $ 1.500,00" in landing.text
