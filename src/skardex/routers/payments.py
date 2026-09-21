@@ -8,6 +8,14 @@ from skardex.clock import today
 from skardex.db import get_db
 from skardex.models import Movement, User
 from skardex.money import format_cop
+from skardex.pagination import (
+    PER_PAGE_COOKIE,
+    Page,
+    paginate_query,
+    parse_page,
+    remember_per_page,
+    resolve_per_page,
+)
 from skardex.security import CurrentUser, require_admin
 from skardex.services.billing_service import (
     EmptySelectionError,
@@ -17,6 +25,7 @@ from skardex.services.billing_service import (
     list_unpriced_sales,
     pending_total,
     register_payment,
+    sales_query,
 )
 from skardex.templating import templates
 
@@ -48,26 +57,41 @@ def _screen(
     selected_ids: set[int] | None = None,
     paid_on: str | None = None,
     status_code: int = status.HTTP_200_OK,
+    page: str = "",
+    per_page: str = "",
 ) -> Response:
     """Render the screen. `selected_ids` is what the admin had ticked when a
     submission was rejected (None means the default: everything ticked)."""
-    sales = list_sales(db, estado=estado)
-    # The headline figures are always about what is still pending, whichever
-    # tab is showing.
-    pending = sales if estado == "pendientes" else list_sales(db, estado="pendientes")
+    # The headline figures are always about everything still pending, whichever
+    # tab (and page) is showing.
+    pending = list_sales(db, estado="pendientes")
+    # Pendientes is never paged: the admin selects and pays from it and its
+    # total has to be seen in full. Pagados and Todos are cut by page.
+    shown: Page[Movement] | None = None
+    if estado == "pendientes":
+        sales = pending
+    else:
+        shown = paginate_query(
+            sales_query(db, estado=estado),
+            page=parse_page(page),
+            per_page=resolve_per_page(per_page, request.cookies.get(PER_PAGE_COOKIE)),
+        )
+        sales = shown.items
     chosen = (
         pending
         if selected_ids is None
         else [sale for sale in pending if sale.id in selected_ids]
     )
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "payments/list.html",
         {
             "user": user,
             "estado": estado,
             "sales": sales,
+            "pg": shown,
+            "params": {"estado": estado},
             "pending_total": pending_total(pending),
             "pending_count": len(pending),
             "unpriced": list_unpriced_sales(db),
@@ -81,6 +105,8 @@ def _screen(
         },
         status_code=status_code,
     )
+    remember_per_page(response, per_page)
+    return response
 
 
 @router.get("")
@@ -89,10 +115,12 @@ def list_payments(
     user: CurrentUser,
     db: Session = Depends(get_db),
     estado: str = "pendientes",
+    page: str = "",
+    per_page: str = "",
 ) -> Response:
     if estado not in _VALID_ESTADOS:
         estado = "pendientes"
-    return _screen(request, user, db, estado=estado)
+    return _screen(request, user, db, estado=estado, page=page, per_page=per_page)
 
 
 @router.post("/register")

@@ -1,6 +1,8 @@
+import html as html_lib
 import re
 from collections.abc import Callable
 from datetime import date, timedelta
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,7 +10,7 @@ from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from skardex.clock import today
-from skardex.models import Movement, MovementType, User
+from skardex.models import Material, Movement, MovementType, User
 
 MakeSale = Callable[..., Movement]
 
@@ -595,3 +597,300 @@ def test_the_confirmation_uses_the_singular_for_one_sale(
     )
 
     assert "Se registró el pago de 1 venta por $ 1.500,00" in landing.text
+
+
+# --- pagination (spec 005) ------------------------------------------------
+
+
+def _sales(
+    make_sale: MakeSale,
+    user: User,
+    material: Material,
+    count: int,
+    *,
+    paid: bool,
+    start: int = 1,
+    price: str = "1000",
+) -> None:
+    """`count` sales noted `fila001`.., dated so that the highest is the newest."""
+    for i in range(start, start + count):
+        make_sale(
+            user=user,
+            material=material,
+            note=f"fila{i:03d}",
+            price=price,
+            movement_date=date(2026, 1, 1) + timedelta(days=i),
+            paid_on=date(2026, 8, 1) if paid else None,
+        )
+
+
+def _rows(html: str) -> list[str]:
+    return re.findall(r"fila\d{3}", _table(html, "sales-table"))
+
+
+def _links(html: str) -> list[str]:
+    return [html_lib.unescape(href) for href in re.findall(r'href="([^"]*)"', html)]
+
+
+def _query(link: str) -> dict[str, list[str]]:
+    return parse_qs(urlsplit(link).query)
+
+
+def _kpis(html: str) -> tuple[str, str]:
+    """(total pendiente, ventas pendientes) as shown in the headline figures."""
+    values = re.findall(r'class="k-kpi__value[^"]*">([^<]*)<', html)
+    return values[0], values[1]
+
+
+def test_the_paid_view_shows_10_rows_by_default_newest_first(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H1-01, EARS-H2-01"""
+    _sales(make_sale, admin_user, material, 23, paid=True)
+
+    html = admin_client.get("/payments?estado=pagados").text
+
+    assert _rows(html) == [f"fila{i:03d}" for i in range(23, 13, -1)]
+    assert "Mostrando 1–10 de 23" in html
+    second = admin_client.get("/payments?estado=pagados&page=2").text
+    assert _rows(second) == [f"fila{i:03d}" for i in range(13, 3, -1)]
+
+
+def test_the_all_view_is_paged_over_paid_and_pending_together(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H1-01, EARS-H3-03"""
+    _sales(make_sale, admin_user, material, 12, paid=True)
+    _sales(make_sale, admin_user, material, 11, paid=False, start=13)
+
+    html = admin_client.get("/payments?estado=todos&per_page=25").text
+    assert len(_rows(html)) == 23
+
+    paged = admin_client.get("/payments?estado=todos&per_page=10").text
+    assert "Mostrando 1–10 de 23" in paged
+    assert _rows(paged) == [f"fila{i:03d}" for i in range(23, 13, -1)]
+
+
+@pytest.mark.parametrize("size", [25, 50])
+def test_a_chosen_size_is_used_in_the_paid_view(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+    size: int,
+) -> None:
+    """EARS-H2-01"""
+    _sales(make_sale, admin_user, material, 60, paid=True)
+
+    html = admin_client.get(f"/payments?estado=pagados&per_page={size}").text
+
+    assert len(_rows(html)) == size
+
+
+def test_pending_is_never_paged_and_keeps_its_payment_form(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H6-03"""
+    _sales(make_sale, admin_user, material, 23, paid=False)
+    admin_client.get("/materials?per_page=10")  # a remembered size of 10
+
+    html = admin_client.get("/payments").text
+
+    assert len(_rows(html)) == 23
+    assert 'id="payment-form"' in html
+    assert html.count('<input type="checkbox" name="movement_ids"') == 23
+    assert "23 de 23 ventas" in html
+    assert "k-pager" not in html
+    assert "Filas por página" not in html
+
+
+def test_paying_a_long_pending_list_still_works_in_one_go(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+    db_session: Session,
+) -> None:
+    """EARS-H6-03"""
+    _sales(make_sale, admin_user, material, 23, paid=False)
+    ids = [m.id for m in db_session.query(Movement).all()]
+
+    response = admin_client.post(
+        "/payments/register",
+        data={"movement_ids": [str(i) for i in ids], "paid_on": "2026-09-10"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert db_session.query(Movement).filter(Movement.paid_at.is_(None)).count() == 0
+
+
+def test_the_pending_total_and_count_do_not_depend_on_the_page_or_the_tab(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H6-01"""
+    _sales(make_sale, admin_user, material, 23, paid=False)
+    _sales(make_sale, admin_user, material, 15, paid=True, start=24)
+
+    expected = ("$ 23.000,00", "23")
+    urls = [
+        "/payments",
+        "/payments?estado=pagados",
+        "/payments?estado=pagados&page=2",
+        "/payments?estado=pagados&page=99",
+        "/payments?estado=todos",
+        "/payments?estado=todos&page=3&per_page=10",
+        "/payments?estado=todos&per_page=100",
+    ]
+    for url in urls:
+        assert _kpis(admin_client.get(url).text) == expected, url
+
+
+def test_the_unpriced_table_is_never_paged(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H6-03"""
+    _sales(make_sale, admin_user, material, 12, paid=True)
+    for i in range(15):
+        make_sale(user=admin_user, material=material, price=None, note=f"sin{i:03d}")
+
+    html = admin_client.get("/payments?estado=pagados").text
+
+    assert len(re.findall(r"sin\d{3}", _table(html, "unpriced-table"))) == 15
+    assert "Mostrando 1–10 de 12" in html  # the unpriced ones are not counted
+
+
+@pytest.mark.parametrize(
+    ("client_name", "user_name"),
+    [("admin_client", "admin_user"), ("operario_client", "operario_user")],
+)
+def test_the_paid_and_all_views_have_the_controls_above_and_below(
+    request: pytest.FixtureRequest,
+    material: Material,
+    make_sale: MakeSale,
+    client_name: str,
+    user_name: str,
+) -> None:
+    """EARS-H1-02"""
+    client: TestClient = request.getfixturevalue(client_name)
+    user: User = request.getfixturevalue(user_name)
+    _sales(make_sale, user, material, 23, paid=True)
+
+    for estado in ("pagados", "todos"):
+        html = client.get(f"/payments?estado={estado}&page=2").text
+
+        assert html.count('class="k-pager"') == 2
+        assert html.count("Mostrando 11–20 de 23") == 2
+        table = html.index('id="sales-table"')
+        table_end = html.index("</table>", table)
+        first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
+        assert first < table
+        assert second > table_end
+
+
+def test_the_paid_view_disables_previous_and_next_at_the_ends(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H1-03"""
+    _sales(make_sale, admin_user, material, 23, paid=True)
+
+    first = admin_client.get("/payments?estado=pagados").text
+    last = admin_client.get("/payments?estado=pagados&page=3").text
+
+    assert first.count('aria-disabled="true">Anterior') == 2
+    assert first.count('aria-disabled="true">Siguiente') == 0
+    assert last.count('aria-disabled="true">Siguiente') == 2
+
+
+def test_an_empty_paid_view_shows_the_message_and_no_controls(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H1-04"""
+    html = admin_client.get("/payments?estado=pagados").text
+
+    assert "Aún no hay ventas pagadas" in html
+    assert "k-pager" not in html
+
+
+def test_a_page_past_the_end_and_garbage_values_in_the_paid_view(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H1-05, EARS-H1-06"""
+    _sales(make_sale, admin_user, material, 23, paid=True)
+
+    past = admin_client.get("/payments?estado=pagados&page=99")
+    assert past.status_code == 200
+    assert _rows(past.text) == ["fila003", "fila002", "fila001"]
+
+    garbage = admin_client.get("/payments?estado=pagados&page=abc&per_page=7")
+    assert garbage.status_code == 200
+    assert len(_rows(garbage.text)) == 10
+
+
+def test_page_links_keep_the_tab_and_the_tabs_go_back_to_page_one(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H3-01, EARS-H3-02"""
+    _sales(make_sale, admin_user, material, 60, paid=True)
+
+    html = admin_client.get("/payments?estado=pagados&page=3").text
+
+    paging = [
+        _query(link) for link in _links(html) if "page=" in link.replace("per_page", "")
+    ]
+    assert paging
+    for query in paging:
+        assert query["estado"] == ["pagados"]
+    tabs = [
+        _query(link)
+        for link in _links(html)
+        if link.startswith("/payments?")
+        and "per_page" not in link
+        and "page=" not in link.replace("per_page", "")
+    ]
+    assert {q["estado"][0] for q in tabs} == {"pendientes", "pagados", "todos"}
+    sizes = [_query(link) for link in _links(html) if "per_page=50" in link]
+    assert sizes
+    for query in sizes:
+        assert query["estado"] == ["pagados"]
+        assert "page" not in query
+
+
+def test_the_size_is_remembered_from_the_payments_screen_and_shared(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H2-03"""
+    _sales(make_sale, admin_user, material, 60, paid=True)
+
+    chosen = admin_client.get("/payments?estado=pagados&per_page=25")
+    assert "per_page=25" in chosen.headers["set-cookie"]
+
+    assert len(_rows(admin_client.get("/payments?estado=todos").text)) == 25
+    assert "set-cookie" not in admin_client.get("/payments?estado=todos").headers

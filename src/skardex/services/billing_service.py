@@ -87,11 +87,12 @@ def _is_pending_sale(movement: Movement) -> bool:
     )
 
 
-def list_sales(db: Session, *, estado: str) -> list[Movement]:
-    """Sales that have a price, by payment status.
+def sales_query(db: Session, *, estado: str) -> Query[Movement]:
+    """Sales that have a price, by payment status, already ordered.
 
     Sales without a price, salidas that are not sales and movements from
-    before this feature (no reason) never appear here.
+    before this feature (no reason) never appear here. Every order ends in
+    `id` so paging never repeats or skips a row.
     """
     if estado not in ("pendientes", "pagados", "todos"):
         raise ValueError(estado)
@@ -103,14 +104,17 @@ def list_sales(db: Session, *, estado: str) -> list[Movement]:
     )
     if estado == "pendientes":
         # Chronological, so a cut-off report reads oldest first.
-        return (
-            query.filter(Movement.paid_at.is_(None))
-            .order_by(Movement.movement_date, Movement.id)
-            .all()
+        return query.filter(Movement.paid_at.is_(None)).order_by(
+            Movement.movement_date, Movement.id
         )
     if estado == "pagados":
         query = query.filter(Movement.paid_at.is_not(None))
-    return query.order_by(Movement.movement_date.desc(), Movement.id.desc()).all()
+    return query.order_by(Movement.movement_date.desc(), Movement.id.desc())
+
+
+def list_sales(db: Session, *, estado: str) -> list[Movement]:
+    """Every sale of `sales_query`, unpaged (the pending list and its total)."""
+    return sales_query(db, estado=estado).all()
 
 
 def unpriced_sale_conditions() -> tuple[ColumnElement[bool], ...]:

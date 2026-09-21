@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
 
-from skardex.models import User
+from skardex.models import User, UserRole
 from skardex.security import verify_password
 from skardex.services.user_service import MIN_PASSWORD_LENGTH
 
@@ -255,3 +255,20 @@ def test_reset_unknown_user_returns_404(admin_client: TestClient) -> None:
     response = admin_client.post("/users/9999/reset-password")
 
     assert response.status_code == 404
+
+
+def test_the_users_list_is_not_paged(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H6-03 (spec 005): a short list by nature, so no page controls."""
+    for i in range(1, 16):
+        db_session.add(
+            User(username=f"operario{i:02d}", password_hash="x", role=UserRole.OPERARIO)
+        )
+    db_session.commit()
+
+    html = admin_client.get("/users").text
+
+    assert len(re.findall(r"operario\d{2}", html)) >= 15
+    assert "k-pager" not in html
+    assert "Filas por página" not in html
