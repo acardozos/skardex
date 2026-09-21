@@ -8,6 +8,13 @@ from skardex.constants import UNITS
 from skardex.db import get_db
 from skardex.models import Material, User
 from skardex.money import InvalidMoneyError, parse_money
+from skardex.pagination import (
+    PER_PAGE_COOKIE,
+    paginate_query,
+    parse_page,
+    remember_per_page,
+    resolve_per_page,
+)
 from skardex.security import CurrentUser, require_admin
 from skardex.services.material_service import (
     DuplicateMaterialCodeError,
@@ -66,6 +73,8 @@ def list_materials(
     q: str = "",
     estado: str = "activos",
     precio: str = "",
+    page: str = "",
+    per_page: str = "",
 ) -> Response:
     if estado not in _VALID_ESTADOS:
         estado = "activos"
@@ -88,18 +97,28 @@ def list_materials(
         like = f"%{q}%"
         query = query.filter(Material.name.ilike(like) | Material.code.ilike(like))
 
-    materials = query.order_by(Material.name).all()
-    return templates.TemplateResponse(
+    shown = paginate_query(
+        # `id` breaks ties so a row never hops between pages.
+        query.order_by(Material.name, Material.id),
+        page=parse_page(page),
+        per_page=resolve_per_page(per_page, request.cookies.get(PER_PAGE_COOKIE)),
+    )
+    response = templates.TemplateResponse(
         request,
         "materials/list.html",
         {
-            "materials": materials,
+            "materials": shown.items,
+            "pg": shown,
+            # Only the sanitised filters: page links must never echo raw input.
+            "params": {"q": q, "estado": estado, "precio": precio},
             "user": user,
             "q": q,
             "estado": estado,
             "precio": precio,
         },
     )
+    remember_per_page(response, per_page)
+    return response
 
 
 @router.get("/new")

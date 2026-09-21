@@ -1,4 +1,7 @@
+import html as html_lib
+import re
 from decimal import Decimal
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -614,3 +617,250 @@ def test_operario_cannot_set_or_change_a_sale_price(
     assert db_session.query(Material).count() == 1
     db_session.refresh(material)
     assert material.sale_price == Decimal("1500.00")
+
+
+# --- pagination (spec 005) ------------------------------------------------
+
+
+def _catalog(db: Session, count: int, **fields: object) -> None:
+    """`count` materials coded C001.., named Mat001.. (so name order == code order)."""
+    for i in range(1, count + 1):
+        db.add(Material(code=f"C{i:03d}", name=f"Mat{i:03d}", unit="kg", **fields))
+    db.commit()
+
+
+def _codes(html: str) -> list[str]:
+    """The codes of the rows shown, in display order."""
+    return re.findall(r'data-label="Código" class="k-dim">(C\d{3})', html)
+
+
+def _links(html: str) -> list[str]:
+    return [html_lib.unescape(href) for href in re.findall(r'href="([^"]*)"', html)]
+
+
+def _query(link: str) -> dict[str, list[str]]:
+    return parse_qs(urlsplit(link).query)
+
+
+def test_the_catalog_shows_10_rows_by_default_ordered_by_name(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-01, EARS-H2-01"""
+    _catalog(db_session, 23)
+
+    html = admin_client.get("/materials").text
+
+    assert _codes(html) == [f"C{i:03d}" for i in range(1, 11)]
+    assert "Mostrando 1–10 de 23" in html
+    assert _codes(admin_client.get("/materials?page=3").text) == [
+        "C021",
+        "C022",
+        "C023",
+    ]
+
+
+@pytest.mark.parametrize("size", [25, 50])
+def test_a_chosen_page_size_is_used_in_the_catalog(
+    admin_client: TestClient, db_session: Session, size: int
+) -> None:
+    """EARS-H2-01"""
+    _catalog(db_session, 60)
+
+    html = admin_client.get(f"/materials?per_page={size}").text
+
+    assert len(_codes(html)) == size
+    assert f"Mostrando 1–{size} de 60" in html
+
+
+@pytest.mark.parametrize("client_name", ["admin_client", "operario_client"])
+def test_the_catalog_has_the_controls_above_and_below_for_both_roles(
+    request: pytest.FixtureRequest, db_session: Session, client_name: str
+) -> None:
+    """EARS-H1-02"""
+    client: TestClient = request.getfixturevalue(client_name)
+    _catalog(db_session, 23)
+
+    html = client.get("/materials?page=2").text
+
+    assert html.count('class="k-pager"') == 2
+    assert html.count("Mostrando 11–20 de 23") == 2
+    table = html.index('<table class="k-table">')
+    first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
+    assert first < table < second
+
+
+def test_the_catalog_disables_previous_and_next_at_the_ends(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-03"""
+    _catalog(db_session, 23)
+
+    first = admin_client.get("/materials").text
+    last = admin_client.get("/materials?page=3").text
+
+    assert first.count('aria-disabled="true">Anterior') == 2
+    assert first.count('aria-disabled="true">Siguiente') == 0
+    assert last.count('aria-disabled="true">Siguiente') == 2
+    assert last.count('aria-disabled="true">Anterior') == 0
+
+
+def test_the_catalog_shows_no_controls_when_there_is_nothing_to_list(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-04"""
+    empty = admin_client.get("/materials").text
+    assert "Aún no hay materiales" in empty
+    assert "k-pager" not in empty
+
+    _catalog(db_session, 12)
+    filtered = admin_client.get("/materials?q=no-existe").text
+    assert "Ningún material coincide con ese filtro o búsqueda." in filtered
+    assert "k-pager" not in filtered
+
+
+def test_the_summary_counts_the_filtered_total_and_pages_keep_every_filter(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-01, EARS-H3-03: search + status + price filter, combined."""
+    # 30 active without price whose name contains "tubo"; noise that must not count
+    for i in range(1, 31):
+        db_session.add(Material(code=f"C{i:03d}", name=f"Tubo {i:03d}", unit="kg"))
+    db_session.add_all(
+        [
+            Material(
+                code="C900", name="Tubo con precio", unit="kg", sale_price=Decimal("5")
+            ),
+            Material(code="C901", name="Tubo inactivo", unit="kg", is_active=False),
+            Material(code="C902", name="Cable", unit="kg"),
+        ]
+    )
+    db_session.commit()
+
+    html = admin_client.get("/materials?q=tubo&estado=activos&precio=sin").text
+
+    assert "Mostrando 1–10 de 30" in html
+    following = [
+        _query(link)
+        for link in _links(html)
+        if link.startswith("/materials?") and _query(link).get("page") == ["2"]
+    ]
+    assert following, "no next-page link found"
+    for query in following:
+        assert query["q"] == ["tubo"]
+        assert query["estado"] == ["activos"]
+        assert query["precio"] == ["sin"]
+    assert "Cable" not in html and "Tubo inactivo" not in html
+
+
+def test_changing_a_catalog_filter_goes_back_to_page_one(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-02"""
+    _catalog(db_session, 60)
+
+    html = admin_client.get("/materials?page=3&q=Mat").text
+
+    toggles = [
+        _query(link)
+        for link in _links(html)
+        if link.startswith("/materials?")
+        and (
+            "estado" in _query(link)
+            and "per_page" not in _query(link)
+            or "precio" in _query(link)
+        )
+    ]
+    assert toggles, "no filter links found"
+    for query in toggles:
+        assert "page" not in query
+        assert query["q"] == ["Mat"]
+    form = html[html.index('<form method="get" action="/materials">') :]
+    form = form[: form.index("</form>")]
+    assert 'name="page"' not in form
+
+
+def test_choosing_a_size_in_the_catalog_keeps_the_filters_and_drops_the_page(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H2-02"""
+    _catalog(db_session, 60)
+
+    html = admin_client.get("/materials?page=3&q=Mat&estado=todos").text
+
+    sizes = [_query(link) for link in _links(html) if "per_page=50" in link]
+    assert sizes
+    for query in sizes:
+        assert query["q"] == ["Mat"]
+        assert query["estado"] == ["todos"]
+        assert "page" not in query
+
+
+def test_a_page_past_the_end_of_a_filtered_catalog_shows_the_last_page(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-05"""
+    _catalog(db_session, 23)
+
+    response = admin_client.get("/materials?q=Mat&page=99")
+
+    assert response.status_code == 200
+    assert _codes(response.text) == ["C021", "C022", "C023"]
+
+
+def test_garbage_paging_parameters_in_the_catalog_use_the_defaults(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-06"""
+    _catalog(db_session, 23)
+
+    response = admin_client.get("/materials?page=abc&per_page=7")
+
+    assert response.status_code == 200
+    assert len(_codes(response.text)) == 10
+
+
+def test_catalog_links_do_not_echo_unknown_parameters(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-01"""
+    _catalog(db_session, 23)
+
+    html = admin_client.get("/materials?evil=zzmarker&estado=bogus&precio=x").text
+
+    assert "zzmarker" not in html
+    assert "bogus" not in html
+
+
+def test_the_operario_keeps_the_admin_only_filters_out_of_the_catalog_controls(
+    operario_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-01: paging does not open the admin-only filters to the operario."""
+    _catalog(db_session, 23)
+
+    html = operario_client.get("/materials").text
+
+    assert "Inactivos" not in html
+    assert "Sin precio</a>" not in html
+    assert html.count('class="k-pager"') == 2
+
+
+def test_the_page_size_chosen_in_the_history_is_used_in_the_catalog(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H2-03: one cookie, shared by every paginated list."""
+    _catalog(db_session, 60)
+    admin_client.get("/movements?per_page=25")
+
+    assert len(_codes(admin_client.get("/materials").text)) == 25
+
+
+def test_the_catalog_remembers_the_size_it_is_given(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H2-03"""
+    _catalog(db_session, 60)
+
+    chosen = admin_client.get("/materials?per_page=50")
+
+    assert "per_page=50" in chosen.headers["set-cookie"]
+    assert len(_codes(admin_client.get("/materials").text)) == 50

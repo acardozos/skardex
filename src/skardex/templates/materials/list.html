@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pagination.html" import pager %}
 
 {% block title %}Materiales — Simple Kardex{% endblock %}
 
@@ -28,17 +29,18 @@
             <input class="k-input" type="search" name="q" placeholder="Buscar por nombre o código" value="{{ q }}">
         </form>
         {% if user.role == "admin" %}
-        {% set keep = ("&q=" ~ (q | urlencode) if q else "") ~ ("&precio=sin" if precio == "sin" else "") %}
         <nav class="k-seg">
-            <a class="{% if estado == 'activos' %}is-active{% endif %}" href="/materials?estado=activos{{ keep }}">Activos</a>
-            <a class="{% if estado == 'inactivos' %}is-active{% endif %}" href="/materials?estado=inactivos{{ keep }}">Inactivos</a>
-            <a class="{% if estado == 'todos' %}is-active{% endif %}" href="/materials?estado=todos{{ keep }}">Todos</a>
+            <a class="{% if estado == 'activos' %}is-active{% endif %}" href="{{ page_url('/materials', params, estado='activos') }}">Activos</a>
+            <a class="{% if estado == 'inactivos' %}is-active{% endif %}" href="{{ page_url('/materials', params, estado='inactivos') }}">Inactivos</a>
+            <a class="{% if estado == 'todos' %}is-active{% endif %}" href="{{ page_url('/materials', params, estado='todos') }}">Todos</a>
         </nav>
         <nav class="k-seg">
-            <a class="{% if precio == 'sin' %}is-active{% endif %}" href="/materials?estado={{ estado }}{% if q %}&q={{ q | urlencode }}{% endif %}{% if precio != 'sin' %}&precio=sin{% endif %}">Sin precio</a>
+            <a class="{% if precio == 'sin' %}is-active{% endif %}" href="{{ page_url('/materials', params, precio=None if precio == 'sin' else 'sin') }}">Sin precio</a>
         </nav>
         {% endif %}
     </div>
+
+    {{ pager(pg, "/materials", params) }}
 
     <div class="k-card">
         <table class="k-table">
@@ -102,5 +104,7 @@
         </div>
         {% endif %}
     </div>
+
+    {{ pager(pg, "/materials", params) }}
 </main>
 {% endblock %}
