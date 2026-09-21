@@ -1,7 +1,9 @@
+import html as html_lib
 import re
 from collections.abc import Callable
 from datetime import date, timedelta
 from decimal import Decimal
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -261,3 +263,392 @@ def test_the_alert_leads_to_the_sales_and_disappears_once_they_are_priced(
     )
 
     assert "unpriced-alert" not in admin_client.get("/").text
+
+
+# --- balances table: pagination and filters (spec 005) ---------------------
+
+
+def _stock(db: Session, count: int, *, low: frozenset[int] = frozenset()) -> None:
+    """`count` active materials coded C001.., named Mat001..; those in `low` have
+    a minimum of 5 and no movements, so their balance (0) is below it."""
+    for i in range(1, count + 1):
+        db.add(
+            Material(
+                code=f"C{i:03d}",
+                name=f"Mat{i:03d}",
+                unit="kg",
+                min_stock=Decimal("5") if i in low else None,
+            )
+        )
+    db.commit()
+
+
+def _names(html: str) -> list[str]:
+    """The materials of the balances table (not the alert chips), in order."""
+    return re.findall(r'data-label="Material" class="k-strong">(Mat\d{3})<', html)
+
+
+def _balances(html: str) -> dict[str, str]:
+    return {
+        name: balance
+        for name, balance in re.findall(
+            r'data-label="Material" class="k-strong">(Mat\d{3})</td>.*?'
+            r'data-label="Saldo actual" class="k-num[^"]*">([^<]*)<',
+            html,
+            re.S,
+        )
+    }
+
+
+def _links(html: str) -> list[str]:
+    return [html_lib.unescape(href) for href in re.findall(r'href="([^"]*)"', html)]
+
+
+def _query(link: str) -> dict[str, list[str]]:
+    return parse_qs(urlsplit(link).query)
+
+
+def test_the_balances_table_shows_10_rows_by_default_ordered_by_name(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-01, EARS-H1-01, EARS-H2-01"""
+    _stock(db_session, 23)
+
+    html = admin_client.get("/").text
+
+    assert _names(html) == [f"Mat{i:03d}" for i in range(1, 11)]
+    assert "Mostrando 1–10 de 23" in html
+    assert _names(admin_client.get("/?page=3").text) == [
+        "Mat021",
+        "Mat022",
+        "Mat023",
+    ]
+
+
+@pytest.mark.parametrize("size", [25, 50])
+def test_a_chosen_size_is_used_in_the_balances_table(
+    admin_client: TestClient, db_session: Session, size: int
+) -> None:
+    """EARS-H2-01"""
+    _stock(db_session, 60)
+
+    html = admin_client.get(f"/?per_page={size}").text
+
+    assert len(_names(html)) == size
+
+
+@pytest.mark.parametrize("client_name", ["admin_client", "operario_client"])
+def test_the_balances_table_has_the_controls_above_and_below(
+    request: pytest.FixtureRequest, db_session: Session, client_name: str
+) -> None:
+    """EARS-H1-02"""
+    client: TestClient = request.getfixturevalue(client_name)
+    _stock(db_session, 23)
+
+    html = client.get("/?page=2").text
+
+    assert html.count('class="k-pager"') == 2
+    assert html.count("Mostrando 11–20 de 23") == 2
+    table = html.index('<table class="k-table">')
+    first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
+    assert first < table < second
+
+
+def test_the_balances_table_disables_previous_and_next_at_the_ends(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-03"""
+    _stock(db_session, 23)
+
+    first = admin_client.get("/").text
+    last = admin_client.get("/?page=3").text
+
+    assert first.count('aria-disabled="true">Anterior') == 2
+    assert first.count('aria-disabled="true">Siguiente') == 0
+    assert last.count('aria-disabled="true">Siguiente') == 2
+
+
+def test_no_controls_when_there_are_no_materials_or_no_match(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-04"""
+    empty = admin_client.get("/").text
+    assert "Aún no hay materiales" in empty
+    assert "k-pager" not in empty
+
+    _stock(db_session, 12)
+    none = admin_client.get("/?q=no-existe").text
+    assert "Ningún material coincide con ese filtro o búsqueda." in none
+    assert "Aún no hay materiales" not in none
+    assert "k-pager" not in none
+
+
+def test_a_page_past_the_end_and_garbage_values(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-05, EARS-H1-06"""
+    _stock(db_session, 23)
+
+    past = admin_client.get("/?page=99")
+    assert past.status_code == 200
+    assert _names(past.text) == ["Mat021", "Mat022", "Mat023"]
+
+    garbage = admin_client.get("/?page=abc&per_page=7&bajo_minimo=quizas")
+    assert garbage.status_code == 200
+    assert len(_names(garbage.text)) == 10
+
+
+def test_the_search_matches_name_or_code_ignoring_case(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-02"""
+    db_session.add_all(
+        [
+            Material(code="TUB-01", name="Tubo de cobre", unit="kg"),
+            Material(code="CAB-02", name="Cable", unit="kg"),
+            Material(code="XYZ", name="Codo TUBular", unit="kg"),
+            Material(code=None, name="Sin código", unit="kg"),
+        ]
+    )
+    db_session.commit()
+
+    by_name = admin_client.get("/?q=tubo").text
+    assert "Tubo de cobre" in by_name
+    assert "Cable" not in by_name and "Sin código" not in by_name
+
+    by_code = admin_client.get("/?q=cab-").text
+    assert "Cable" in by_code
+    assert "Tubo de cobre" not in by_code
+
+    mixed = admin_client.get("/?q=TUB").text
+    assert "Tubo de cobre" in mixed and "Codo TUBular" in mixed
+    assert "Mostrando 1–2 de 2" in mixed
+
+    assert "Sin código" in admin_client.get("/?q=sin").text  # a null code is fine
+
+
+def test_only_below_minimum_shows_just_the_low_materials(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-03"""
+    _stock(db_session, 23, low=frozenset({4, 19, 22}))
+
+    html = admin_client.get("/?bajo_minimo=1").text
+
+    assert _names(html) == ["Mat004", "Mat019", "Mat022"]
+    assert "Mostrando 1–3 de 3" in html
+    assert "k-tag--ok" not in _table_body(html)
+
+
+def _table_body(html: str) -> str:
+    return html[html.index("<tbody>") : html.index("</tbody>")]
+
+
+def test_only_below_minimum_combines_with_the_search(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-03"""
+    _stock(db_session, 23, low=frozenset({4, 19, 22}))
+
+    html = admin_client.get("/?bajo_minimo=1&q=Mat01").text
+
+    assert _names(html) == ["Mat019"]
+
+
+def test_a_material_at_its_minimum_is_not_below_it(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H5-03: the same rule as the alert (strictly below)."""
+    material = Material(code="C1", name="Mat001", unit="kg", min_stock=Decimal("5"))
+    db_session.add(material)
+    db_session.commit()
+    db_session.add(
+        Movement(
+            material_id=material.id,
+            user_id=admin_user.id,
+            type=MovementType.ENTRADA,
+            quantity=Decimal("5"),
+            movement_date=date(2026, 1, 1),
+        )
+    )
+    db_session.commit()
+
+    html = admin_client.get("/?bajo_minimo=1").text
+
+    assert _names(html) == []
+
+
+def test_any_other_value_of_the_low_filter_is_ignored(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-03"""
+    _stock(db_session, 12, low=frozenset({1}))
+
+    for value in ("0", "si", "true", "1 ", ""):
+        html = admin_client.get("/", params={"bajo_minimo": value}).text
+        assert "Mostrando 1–10 de 12" in html, value
+
+
+def test_the_alert_and_the_figures_ignore_the_page_and_the_filters(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-04: the low materials are on page 3, the alert still lists them."""
+    _stock(db_session, 23, low=frozenset({20, 21, 22, 23}))
+
+    for url in (
+        "/",
+        "/?page=2",
+        "/?page=3",
+        "/?q=Mat001",
+        "/?q=no-existe",
+        "/?bajo_minimo=1&page=2",
+        "/?per_page=100",
+    ):
+        html = admin_client.get(url).text
+        assert "4 materiales están por debajo de su stock mínimo" in html, url
+        assert _kpi_value(html, "Materiales activos") == "23", url
+        assert _kpi_value(html, "Bajo stock mínimo") == "4", url
+        for name in ("Mat020", "Mat021", "Mat022", "Mat023"):
+            assert f'<div class="k-chip">{name}' in html, (url, name)
+
+
+def test_the_alert_links_to_the_table_filtered_to_the_low_materials(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-05"""
+    _stock(db_session, 23, low=frozenset({7, 8}))
+
+    html = admin_client.get("/").text
+
+    assert 'id="low-stock-link" href="/?bajo_minimo=1"' in html
+    followed = admin_client.get("/?bajo_minimo=1").text
+    assert _names(followed) == ["Mat007", "Mat008"]
+
+
+def test_there_is_no_link_when_nothing_is_below_the_minimum(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-05"""
+    _stock(db_session, 12)
+
+    assert "low-stock-link" not in admin_client.get("/").text
+
+
+def test_the_operario_sees_the_same_alert_link_and_filters(
+    operario_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H5-05"""
+    _stock(db_session, 23, low=frozenset({9}))
+
+    html = operario_client.get("/").text
+
+    assert 'id="low-stock-link"' in html
+    assert _names(operario_client.get("/?bajo_minimo=1").text) == ["Mat009"]
+
+
+def test_page_links_keep_the_search_and_the_low_filter(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-01"""
+    _stock(db_session, 60, low=frozenset(range(1, 41)))
+
+    html = admin_client.get("/?q=Mat&bajo_minimo=1").text
+
+    paging = [
+        _query(link)
+        for link in _links(html)
+        if link.startswith("/?") and _query(link).get("page") == ["2"]
+    ]
+    assert paging, "no next-page link found"
+    for query in paging:
+        assert query["q"] == ["Mat"]
+        assert query["bajo_minimo"] == ["1"]
+    assert "Mostrando 1–10 de 40" in html
+
+
+def test_changing_a_filter_or_the_size_goes_back_to_page_one(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-02, EARS-H2-02"""
+    _stock(db_session, 60, low=frozenset(range(1, 41)))
+
+    html = admin_client.get("/?q=Mat&page=3").text
+
+    anchor = re.search(r'href="([^"]*)">Solo bajo el mínimo', html)
+    assert anchor is not None, "no low-filter link found"
+    toggle = _query(html_lib.unescape(anchor.group(1)))
+    assert "page" not in toggle
+    assert toggle["q"] == ["Mat"]
+    sizes = [_query(link) for link in _links(html) if "per_page=50" in link]
+    assert sizes
+    for query in sizes:
+        assert "page" not in query
+        assert query["q"] == ["Mat"]
+    form = html[html.index('<form method="get" action="/">') :]
+    form = form[: form.index("</form>")]
+    assert 'name="page"' not in form
+
+
+def test_the_summary_counts_the_filtered_total(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-03"""
+    _stock(db_session, 60, low=frozenset(range(1, 16)))
+
+    assert "Mostrando 11–15 de 15" in admin_client.get("/?bajo_minimo=1&page=2").text
+
+
+def test_the_size_is_remembered_and_shared_with_the_other_lists(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H2-03"""
+    _stock(db_session, 60)
+
+    chosen = admin_client.get("/?per_page=25")
+    assert "per_page=25" in chosen.headers["set-cookie"]
+
+    assert len(_names(admin_client.get("/").text)) == 25
+    assert "Mostrando 1–25 de 60" in admin_client.get("/materials").text
+
+
+def test_a_materials_balance_is_the_same_on_any_page_or_filter(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H6-02"""
+    _stock(db_session, 23, low=frozenset({15}))
+    target = db_session.query(Material).filter(Material.name == "Mat015").one()
+    db_session.add(
+        Movement(
+            material_id=target.id,
+            user_id=admin_user.id,
+            type=MovementType.ENTRADA,
+            quantity=Decimal("3.5"),
+            movement_date=date(2026, 1, 1),
+        )
+    )
+    db_session.commit()
+
+    seen = {
+        url: _balances(admin_client.get(url).text).get("Mat015")
+        for url in (
+            "/?page=2",
+            "/?per_page=25",
+            "/?q=Mat015",
+            "/?bajo_minimo=1",
+            "/?q=015&per_page=100",
+        )
+    }
+
+    assert set(seen.values()) == {"3.500"}, seen
+
+
+def test_the_dashboard_does_not_echo_unknown_parameters(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-01"""
+    _stock(db_session, 23)
+
+    html = admin_client.get("/?evil=zzmarker&bajo_minimo=bogus").text
+
+    assert "zzmarker" not in html
+    assert "bogus" not in html

@@ -115,6 +115,25 @@ def get_dashboard_data(db: Session) -> DashboardData:
     )
 
 
+def filter_items(
+    items: list[MaterialStockStatus], *, q: str = "", only_low: bool = False
+) -> list[MaterialStockStatus]:
+    """The balances table's filters, over the full list computed by
+    `get_dashboard_data` (so `is_low` keeps a single definition). The alert and
+    the headline figures never go through here."""
+    needle = q.strip().casefold()
+    return [
+        item
+        for item in items
+        if (not only_low or item.is_low)
+        and (
+            not needle
+            or needle in item.material.name.casefold()
+            or needle in (item.material.code or "").casefold()
+        )
+    ]
+
+
 def register_movement(
     db: Session,
     *,

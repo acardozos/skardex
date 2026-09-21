@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pagination.html" import pager %}
 
 {% block title %}Simple Kardex{% endblock %}
 
@@ -48,6 +49,7 @@
             <div class="k-chip">{{ item.material.name }} <span>{{ item.balance }} de {{ item.material.min_stock }} {{ unit_labels.get(item.material.unit, item.material.unit) }}</span></div>
             {% endfor %}
         </div>
+        <a class="k-btn k-btn--ghost k-btn--sm" id="low-stock-link" href="{{ page_url('/', {}, bajo_minimo='1') }}">Ver en la tabla de saldos</a>
     </div>
     {% else %}
     <div class="k-ok"><span class="k-dot"></span> Todos los materiales están sobre su stock mínimo.</div>
@@ -66,6 +68,18 @@
     </div>
     {% endif %}
 
+    <div class="k-toolbar" id="saldos">
+        <form method="get" action="/">
+            <input type="hidden" name="bajo_minimo" value="{{ params.bajo_minimo }}">
+            <input class="k-input" type="search" name="q" placeholder="Buscar por nombre o código" value="{{ q }}">
+        </form>
+        <nav class="k-seg">
+            <a class="{% if only_low %}is-active{% endif %}" href="{{ page_url('/', params, bajo_minimo=None if only_low else '1') }}">Solo bajo el mínimo</a>
+        </nav>
+    </div>
+
+    {{ pager(pg, "/", params) }}
+
     <div class="k-card">
         <div class="k-card__head">
             <h2 class="k-card__title">Saldos por material</h2>
@@ -82,7 +96,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for item in items %}
+                {% for item in pg.items %}
                 <tr>
                     <td data-label="Material" class="k-strong">{{ item.material.name }}</td>
                     <td data-label="Unidad" class="k-dim">{{ unit_labels.get(item.material.unit, item.material.unit) }}</td>
@@ -94,14 +108,21 @@
             </tbody>
         </table>
 
-        {% if not items %}
+        {% if not pg.items %}
         <div class="k-empty">
             <span class="k-empty__icon">📦</span>
+            {% if q or only_low %}
+            <h3>Sin resultados</h3>
+            <p>Ningún material coincide con ese filtro o búsqueda.</p>
+            {% else %}
             <h3>Aún no hay materiales</h3>
             <p>Crea tu primer material en el catálogo y los saldos aparecerán aquí.</p>
             <a class="k-btn k-btn--primary" href="/materials">Ir a materiales</a>
+            {% endif %}
         </div>
         {% endif %}
     </div>
+
+    {{ pager(pg, "/", params) }}
 </main>
 {% endblock %}
