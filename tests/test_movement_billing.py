@@ -1,7 +1,9 @@
+import html as html_lib
 import re
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from urllib.parse import quote, unquote
 
 import pytest
 from fastapi.testclient import TestClient
@@ -40,6 +42,13 @@ def _undo(client: TestClient, movement: Movement, **extra: str) -> Response:
     return client.post(
         f"/movements/{movement.id}/undo-payment", data=extra, follow_redirects=False
     )
+
+
+def _next_of(html: str, movement: Movement) -> str:
+    """The (decoded) `next` of the correction link of one movement on a page."""
+    match = re.search(rf'href="/movements/{movement.id}/billing\?next=([^"]*)"', html)
+    assert match is not None, f"no correction link for movement {movement.id}"
+    return unquote(html_lib.unescape(match.group(1)))
 
 
 def _state(html: str) -> str:
@@ -510,7 +519,7 @@ def test_the_history_offers_the_correction_to_the_admin_on_every_salida(
     html = admin_client.get("/movements").text
 
     for key, movement in made.items():
-        link = f'href="/movements/{movement.id}/billing"'
+        link = f'href="/movements/{movement.id}/billing?next='
         assert (link in html) is (key != "entrada"), key
 
 
@@ -532,8 +541,8 @@ def test_payments_offers_the_correction_and_returns_to_payments(
 
     html = admin_client.get("/payments").text
 
-    assert f'href="/movements/{priced.id}/billing?next=/payments"' in html
-    assert f'href="/movements/{unpriced.id}/billing?next=/payments"' in html
+    for sale in (priced, unpriced):
+        assert _next_of(html, sale) == "/payments?estado=pendientes"
 
 
 # --- the correction form prefills the reference price --------------------
@@ -642,3 +651,211 @@ def test_after_an_error_the_field_shows_what_the_admin_typed_not_the_reference(
 
     assert response.status_code == 400
     assert _price_input_value(response.text) == "0"
+
+
+# --- coming back to the same page after a correction (spec 005) -----------
+
+
+def _many_sales(
+    make_sale: MakeSale,
+    user: User,
+    material: Material,
+    count: int,
+    *,
+    paid: bool = False,
+    price: str | None = "1000",
+) -> list[Movement]:
+    """`count` sales noted `fila001`.., the highest number being the newest."""
+    return [
+        make_sale(
+            user=user,
+            material=material,
+            note=f"fila{i:03d}",
+            price=price,
+            movement_date=date(2026, 1, 1) + timedelta(days=i),
+            paid_on=date(2026, 8, 1) if paid else None,
+        )
+        for i in range(1, count + 1)
+    ]
+
+
+def test_the_history_links_carry_the_page_the_filters_and_the_size(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H4-01"""
+    sales = _many_sales(make_sale, admin_user, material, 25)
+    on_page_two = sales[9]  # fila010: page 2 of 25 (10 per page, newest first)
+
+    html = admin_client.get("/movements?type=salida&page=2&per_page=10").text
+
+    assert _next_of(html, on_page_two) == "/movements?type=salida&page=2&per_page=10"
+
+
+def test_the_history_links_use_the_corrected_page_and_drop_garbage(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H4-01, EARS-H4-02: `here` is built from the page really shown."""
+    sales = _many_sales(make_sale, admin_user, material, 25)
+
+    html = admin_client.get("/movements?page=99&evil=1&type=bogus").text
+
+    assert _next_of(html, sales[0]) == "/movements?page=3&per_page=10"
+
+
+def test_correcting_a_sale_from_page_two_comes_back_to_page_two(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H4-01"""
+    sales = _many_sales(make_sale, admin_user, material, 25, price=None)
+    target = sales[9]  # fila010, on page 2
+    listing = admin_client.get("/movements?cobro=sin_precio&page=2&per_page=10").text
+    back = _next_of(listing, target)
+    assert back == "/movements?cobro=sin_precio&page=2&per_page=10"
+
+    saved = _post(admin_client, target, "venta", "500", next=back)
+
+    assert saved.status_code == 303
+    assert saved.headers["location"] == back
+    again = admin_client.get(saved.headers["location"]).text
+    assert "Mostrando 11–20 de 24" in again  # one sale left the "sin precio" list
+
+
+def test_undoing_a_payment_from_page_two_comes_back_to_page_two(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H4-01"""
+    sales = _many_sales(make_sale, admin_user, material, 25, paid=True)
+    listing = admin_client.get("/payments?estado=pagados&page=2&per_page=10").text
+    back = _next_of(listing, sales[9])
+    assert back == "/payments?estado=pagados&page=2&per_page=10"
+
+    undone = _undo(admin_client, sales[9], next=back)
+
+    assert undone.status_code == 303
+    assert undone.headers["location"] == back
+
+
+def test_payments_links_return_to_their_tab_and_the_unpriced_table_too(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H4-01"""
+    pending = make_sale(user=admin_user, material=material, note="pen")
+    unpriced = make_sale(user=admin_user, material=material, price=None, note="sin")
+
+    html = admin_client.get("/payments").text
+
+    assert _next_of(html, pending) == "/payments?estado=pendientes"
+    assert _next_of(html, unpriced) == "/payments?estado=pendientes"
+
+
+def test_a_page_that_no_longer_exists_falls_back_to_the_last_valid_one(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    make_sale: MakeSale,
+) -> None:
+    """EARS-H4-02: 11 sales without price -> page 2 has one; fix it and it is gone."""
+    sales = _many_sales(make_sale, admin_user, material, 11, price=None)
+    oldest = sales[0]  # fila001, alone on page 2
+    back = "/movements?cobro=sin_precio&page=2&per_page=10"
+
+    saved = _post(admin_client, oldest, "venta", "500", next=back)
+    after = admin_client.get(saved.headers["location"])
+
+    assert after.status_code == 200
+    assert "Mostrando 1–10 de 10" in after.text
+    assert "fila001" not in after.text.split("<tbody>")[1]
+
+
+@pytest.mark.parametrize(
+    ("next_value", "expected"),
+    [
+        ("https://evil.example/movements", "/movements"),
+        ("//evil.example", "/movements"),
+        ("//evil.example/movements?page=2", "/movements"),
+        ("/\\evil.example", "/movements"),
+        ("javascript:alert(1)", "/movements"),
+        ("/movements@evil.example", "/movements"),
+        ("/movements/../users", "/movements"),
+        ("/users?page=2", "/movements"),
+        ("", "/movements"),
+        (
+            "/movements?page=2&evil=1&next=http://evil.example&material_id=3",
+            "/movements?page=2&material_id=3",
+        ),
+        ("/payments?estado=pagados&type=salida", "/payments?estado=pagados"),
+        ("/payments?page=2&page=9", "/payments?page=2"),
+    ],
+)
+def test_the_return_url_is_rebuilt_and_never_leaves_the_app(
+    admin_client: TestClient,
+    admin_user: User,
+    make_sale: MakeSale,
+    next_value: str,
+    expected: str,
+) -> None:
+    """EARS-H4-03"""
+    corrected = make_sale("Una", user=admin_user, price=None)
+    paid = make_sale("Dos", user=admin_user, paid_on=date(2026, 9, 11))
+
+    saved = _post(admin_client, corrected, "venta", "100", next=next_value)
+    undone = _undo(admin_client, paid, next=next_value)
+
+    assert saved.headers["location"] == expected
+    assert undone.headers["location"] == expected
+    assert "evil" not in saved.headers["location"]
+
+
+def test_the_correction_screen_keeps_the_full_return_url(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H4-01, EARS-H4-03"""
+    sale = make_sale("Una", user=admin_user)
+    back = "/movements?type=salida&page=2&per_page=25"
+
+    html = html_lib.unescape(
+        admin_client.get(
+            f"/movements/{sale.id}/billing?next={quote(back, safe='')}"
+        ).text
+    )
+    evil = html_lib.unescape(
+        admin_client.get(
+            f"/movements/{sale.id}/billing?next=//evil.example/movements"
+        ).text
+    )
+
+    assert f'name="next" value="{back}"' in html
+    assert f'href="{back}">Cancelar' in html
+    assert "evil.example" not in evil
+    assert 'name="next" value="/movements"' in evil
+
+
+def test_a_rejected_correction_keeps_the_return_url(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H4-01: a paid sale cannot be edited; the error page still goes back."""
+    paid = make_sale("Una", user=admin_user, paid_on=date(2026, 9, 11))
+    back = "/payments?estado=pagados&page=2&per_page=10"
+
+    response = admin_client.post(
+        f"/movements/{paid.id}/billing",
+        data={"reason": "venta", "unit_price": "100", "next": back},
+    )
+
+    assert response.status_code == 400
+    assert f'name="next" value="{html_lib.escape(back)}"' in response.text

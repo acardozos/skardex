@@ -13,6 +13,7 @@ from skardex.pagination import (
     parse_page,
     remember_per_page,
     resolve_per_page,
+    safe_return_url,
 )
 
 
@@ -97,8 +98,6 @@ def test_paginate_list_page_past_the_end_shows_the_last_valid_page() -> None:
 def test_paginate_list_page_below_one_is_clamped() -> None:
     shown = paginate_list(list(range(25)), page=0, per_page=10)
     assert shown.page == 1
-
-    shown = paginate_list(list[int](), page=5, per_page=10)
 
 
 def test_paginate_list_empty() -> None:
@@ -221,3 +220,62 @@ def test_build_url_does_not_mutate_the_params() -> None:
     params = {"q": "x"}
     build_url("/", params, page=2)
     assert params == {"q": "x"}
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("/movements", "/movements"),
+        ("/payments", "/payments"),
+        (
+            "/movements?material_id=3&type=salida&cobro=sin_precio&page=2&per_page=25",
+            "/movements?material_id=3&type=salida&cobro=sin_precio&page=2&per_page=25",
+        ),
+        ("/payments?estado=pagados&page=4", "/payments?estado=pagados&page=4"),
+        # unknown keys, and keys of the other list, are dropped
+        ("/movements?page=2&evil=1&estado=pagados", "/movements?page=2"),
+        ("/payments?type=salida&estado=todos", "/payments?estado=todos"),
+        # only the first value of a repeated key, blanks dropped
+        ("/payments?page=2&page=9&estado=", "/payments?page=2"),
+        # a fragment is not part of the destination
+        ("/movements?page=2#top", "/movements?page=2"),
+        # values are re-encoded, never echoed as received
+        ("/movements?type=a%26b%3Dc", "/movements?type=a%26b%3Dc"),
+    ],
+)
+def test_safe_return_url_keeps_only_what_the_list_understands(
+    value: str, expected: str
+) -> None:
+    """EARS-H4-01, EARS-H4-03"""
+    assert safe_return_url(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "https://evil.example/movements",
+        "http://evil.example",
+        "//evil.example",
+        "//evil.example/payments?page=2",
+        "///evil.example",
+        "/\\evil.example",
+        "\\\\evil.example",
+        "javascript:alert(1)",
+        "data:text/html,x",
+        "mailto:a@b.c",
+        "movements",
+        "/movements/",
+        "/movements/../users",
+        "/movements@evil.example",
+        "/movementsx",
+        "/users",
+        "/users?page=2",
+        "/logout",
+        "\n/movements",
+        " /movements",
+    ],
+)
+def test_safe_return_url_falls_back_to_the_history(value: str) -> None:
+    """EARS-H4-03"""
+    assert safe_return_url(value) == "/movements"

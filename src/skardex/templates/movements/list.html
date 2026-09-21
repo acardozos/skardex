@@ -56,7 +56,7 @@
             </thead>
             <tbody>
                 {% for movement in movements %}
-                {% set fix_link %}{% if is_admin and movement.type == "salida" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing">Corregir cobro</a>{% endif %}{% endset %}
+                {% set fix_link %}{% if is_admin and movement.type == "salida" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}{% endset %}
                 <tr>
                     <td data-label="Fecha" class="k-dim">{{ movement.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td data-label="Material" class="k-strong">{{ movement.material.name }}</td>

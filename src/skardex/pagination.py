@@ -9,7 +9,7 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Generic, TypeVar
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from fastapi import Response
 from sqlalchemy.orm import Query
@@ -132,3 +132,31 @@ def build_url(
     merged: dict[str, str | int | None] = {**params, **overrides}
     query = urlencode({k: v for k, v in merged.items() if v not in (None, "")})
     return f"{path}?{query}" if query else path
+
+
+# Where a billing correction may send the admin back to, and which query
+# parameters each of those lists understands. A fixed table on purpose:
+# redirecting to whatever a query string says would be an open redirect.
+_RETURN_PAGES: dict[str, tuple[str, ...]] = {
+    "/movements": ("material_id", "type", "cobro", "page", "per_page"),
+    "/payments": ("estado", "page", "per_page"),
+}
+DEFAULT_RETURN_URL = "/movements"
+
+
+def safe_return_url(value: str) -> str:
+    """The list (with its filters and page) to go back to, rebuilt from `value`.
+
+    The text received is never echoed: only its path is matched against the
+    fixed table, and the query is rebuilt from the parameters that list knows
+    (the first value of each). The list itself tolerates invalid values.
+    """
+    parts = urlsplit(value)
+    if parts.scheme or parts.netloc or parts.path not in _RETURN_PAGES:
+        return DEFAULT_RETURN_URL
+    allowed = _RETURN_PAGES[parts.path]
+    kept: dict[str, str] = {}
+    for key, val in parse_qsl(parts.query, keep_blank_values=False):
+        if key in allowed and key not in kept:
+            kept[key] = val
+    return build_url(parts.path, kept)

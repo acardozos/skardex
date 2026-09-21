@@ -20,10 +20,12 @@ from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.money import InvalidMoneyError, parse_money
 from skardex.pagination import (
     PER_PAGE_COOKIE,
+    build_url,
     paginate_query,
     parse_page,
     remember_per_page,
     resolve_per_page,
+    safe_return_url,
 )
 from skardex.security import CurrentUser, require_admin
 from skardex.services.billing_service import (
@@ -119,20 +121,23 @@ def list_movements(
         page=parse_page(page),
         per_page=resolve_per_page(per_page, request.cookies.get(PER_PAGE_COOKIE)),
     )
+    # Only the sanitised filters: page links must never echo raw input.
+    params = {
+        "material_id": str(selected_material_id) if selected_material_id else "",
+        "type": selected_type,
+        "cobro": selected_cobro,
+    }
     response = templates.TemplateResponse(
         request,
         "movements/list.html",
         {
             "movements": shown.items,
             "pg": shown,
-            # Only the sanitised filters: page links must never echo raw input.
-            "params": {
-                "material_id": str(selected_material_id)
-                if selected_material_id
-                else "",
-                "type": selected_type,
-                "cobro": selected_cobro,
-            },
+            "params": params,
+            # This very page, for the "Corregir cobro" links to come back to.
+            "here": build_url(
+                "/movements", params, page=shown.page, per_page=shown.per_page
+            ),
             "materials": db.query(Material).order_by(Material.name).all(),
             "selected_material_id": selected_material_id,
             "selected_type": selected_type,
@@ -244,14 +249,6 @@ def create_movement(
 
 # --- billing correction (admin only) -------------------------------------
 
-# Where to go back to after a correction. A fixed list, never the raw value:
-# redirecting to whatever a query string says would be an open redirect.
-_BILLING_RETURN_PAGES = {"/movements", "/payments"}
-
-
-def _safe_return_page(value: str) -> str:
-    return value if value in _BILLING_RETURN_PAGES else "/movements"
-
 
 def _salida_or_404(db: Session, movement_id: int) -> Movement:
     """Only a salida has billing; an entrada is treated as if it did not exist."""
@@ -309,7 +306,7 @@ def billing_form(
 ) -> Response:
     movement = _salida_or_404(db, movement_id)
     return _billing_response(
-        request, movement, return_page=_safe_return_page(return_page)
+        request, movement, return_page=safe_return_url(return_page)
     )
 
 
@@ -324,7 +321,7 @@ def update_movement_billing(
     return_page: str = Form("", alias="next"),
 ) -> Response:
     movement = _salida_or_404(db, movement_id)
-    destination = _safe_return_page(return_page)
+    destination = safe_return_url(return_page)
 
     try:
         update_billing(
@@ -360,7 +357,7 @@ def undo_movement_payment(
     return_page: str = Form("", alias="next"),
 ) -> Response:
     movement = _salida_or_404(db, movement_id)
-    destination = _safe_return_page(return_page)
+    destination = safe_return_url(return_page)
 
     try:
         undo_payment(db, movement)

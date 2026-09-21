@@ -11,6 +11,7 @@ from skardex.money import format_cop
 from skardex.pagination import (
     PER_PAGE_COOKIE,
     Page,
+    build_url,
     paginate_query,
     parse_page,
     remember_per_page,
@@ -92,6 +93,17 @@ def _screen(
             "sales": sales,
             "pg": shown,
             "params": {"estado": estado},
+            # This very page, for the "Corregir cobro" links to come back to.
+            "here": (
+                build_url(
+                    "/payments",
+                    {"estado": estado},
+                    page=shown.page,
+                    per_page=shown.per_page,
+                )
+                if shown
+                else build_url("/payments", {"estado": estado})
+            ),
             "pending_total": pending_total(pending),
             "pending_count": len(pending),
             "unpriced": list_unpriced_sales(db),
