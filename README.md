@@ -118,6 +118,12 @@ Deployed with Docker on [Render](https://render.com/), database on
 [Cloudflare](https://www.cloudflare.com/). See `Dockerfile` for the
 build/startup process.
 
+Deploys are started by CI, not by Render's own auto-deploy: on a push to `main`,
+once the tests pass, the `Deploy to Render` job calls the service's
+[deploy hook](https://render.com/docs/deploy-hooks) for the exact commit that was
+tested. The hook URL is kept in the `RENDER_DEPLOY_HOOK_URL` repository secret,
+and Render's own Auto-Deploy is turned off.
+
 ## License
 
 [MIT](LICENSE) — see the `LICENSE` file for the full text.
