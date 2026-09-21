@@ -1,0 +1,31 @@
+{#- Page controls for a paginated list. `pg` is a pagination.Page; `params` holds
+    only the already-sanitised filters of the list, so links never carry stray
+    query parameters. Page-size links drop `page` (they go back to page 1). -#}
+{% macro pager(pg, base_path, params) %}
+{% if pg.total > 0 %}
+<div class="k-pager">
+    <span class="k-pager__summary">Mostrando {{ pg.first }}–{{ pg.last }} de {{ pg.total }}</span>
+    <nav class="k-pager__nav" aria-label="Páginas">
+        {% if pg.has_prev %}
+        <a class="k-btn k-btn--ghost k-btn--sm" rel="prev" href="{{ page_url(base_path, params, page=pg.page - 1, per_page=pg.per_page) }}">Anterior</a>
+        {% else %}
+        <span class="k-btn k-btn--ghost k-btn--sm is-disabled" aria-disabled="true">Anterior</span>
+        {% endif %}
+        <span class="k-pager__pos">Página {{ pg.page }} de {{ pg.pages }}</span>
+        {% if pg.has_next %}
+        <a class="k-btn k-btn--ghost k-btn--sm" rel="next" href="{{ page_url(base_path, params, page=pg.page + 1, per_page=pg.per_page) }}">Siguiente</a>
+        {% else %}
+        <span class="k-btn k-btn--ghost k-btn--sm is-disabled" aria-disabled="true">Siguiente</span>
+        {% endif %}
+    </nav>
+    <div class="k-pager__size">
+        <span class="k-label">Filas por página</span>
+        <nav class="k-seg" aria-label="Filas por página">
+            {% for option in per_page_options %}
+            <a class="{% if option == pg.per_page %}is-active{% endif %}" href="{{ page_url(base_path, params, per_page=option) }}">{{ option }}</a>
+            {% endfor %}
+        </nav>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}

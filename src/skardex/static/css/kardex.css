@@ -158,6 +158,12 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-seg a:hover{color:var(--text);text-decoration:none}
 .k-seg a.is-active{background:var(--surface2);color:var(--text)}
 
+/* ---------- Paginación ---------- */
+.k-pager{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin:12px 0}
+.k-pager__summary,.k-pager__pos{font-size:13px;color:var(--muted)}
+.k-pager__nav,.k-pager__size{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.k-pager .is-disabled{opacity:0.45;pointer-events:none}
+
 /* ---------- Formularios ---------- */
 .k-formcard{width:100%;max-width:480px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px}
 .k-form{display:flex;flex-direction:column;gap:16px}

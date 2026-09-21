@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pagination.html" import pager %}
 
 {% block title %}Movimientos — Simple Kardex{% endblock %}
 
@@ -13,8 +14,6 @@
         <a class="k-btn k-btn--primary" href="/movements/new">Registrar movimiento</a>
     </div>
 
-    {% set keep_material = ("&material_id=" ~ selected_material_id) if selected_material_id else "" %}
-    {% set keep_cobro = "&cobro=sin_precio" if selected_cobro else "" %}
     {% set is_admin = request.session.get("role") == "admin" %}
     <div class="k-toolbar">
         <form method="get" action="/movements">
@@ -28,14 +27,16 @@
             </select>
         </form>
         <nav class="k-seg">
-            <a class="{% if not selected_type %}is-active{% endif %}" href="/movements?type={{ keep_material }}{{ keep_cobro }}">Todos</a>
-            <a class="{% if selected_type == 'entrada' %}is-active{% endif %}" href="/movements?type=entrada{{ keep_material }}{{ keep_cobro }}">Entradas</a>
-            <a class="{% if selected_type == 'salida' %}is-active{% endif %}" href="/movements?type=salida{{ keep_material }}{{ keep_cobro }}">Salidas</a>
+            <a class="{% if not selected_type %}is-active{% endif %}" href="{{ page_url('/movements', params, type=None) }}">Todos</a>
+            <a class="{% if selected_type == 'entrada' %}is-active{% endif %}" href="{{ page_url('/movements', params, type='entrada') }}">Entradas</a>
+            <a class="{% if selected_type == 'salida' %}is-active{% endif %}" href="{{ page_url('/movements', params, type='salida') }}">Salidas</a>
         </nav>
         <nav class="k-seg">
-            <a class="{% if selected_cobro %}is-active{% endif %}" href="/movements?type={{ selected_type }}{{ keep_material }}{% if not selected_cobro %}&cobro=sin_precio{% endif %}">Ventas sin precio</a>
+            <a class="{% if selected_cobro %}is-active{% endif %}" href="{{ page_url('/movements', params, cobro=None if selected_cobro else 'sin_precio') }}">Ventas sin precio</a>
         </nav>
     </div>
+
+    {{ pager(pg, "/movements", params) }}
 
     <div class="k-card">
         <table class="k-table">
@@ -102,5 +103,7 @@
         </div>
         {% endif %}
     </div>
+
+    {{ pager(pg, "/movements", params) }}
 </main>
 {% endblock %}

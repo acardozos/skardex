@@ -1,7 +1,8 @@
 import html as html_lib
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -853,3 +854,465 @@ def test_the_admin_price_field_explains_that_it_is_prefilled(
     html = admin_client.get("/movements/new").text
 
     assert "Se rellena con el precio de referencia" in html
+
+
+# --- pagination (spec 005) ------------------------------------------------
+
+
+def _add_history(
+    db: Session, user: User, material: Material, count: int, **fields: object
+) -> None:
+    """`count` entradas whose note is `fila001`.., dated so that the highest
+    number is the newest (and so comes first in the history)."""
+    for i in range(1, count + 1):
+        db.add(
+            Movement(
+                material_id=material.id,
+                user_id=user.id,
+                type=MovementType.ENTRADA,
+                quantity=Decimal("1"),
+                movement_date=date(2026, 1, 1) + timedelta(days=i),
+                note=f"fila{i:03d}",
+                **fields,
+            )
+        )
+    db.commit()
+
+
+def _rows(html: str) -> list[str]:
+    """The notes of the rows shown, in display order."""
+    return re.findall(r"fila\d{3}", html)
+
+
+def _links(html: str) -> list[str]:
+    return [html_lib.unescape(href) for href in re.findall(r'href="([^"]*)"', html)]
+
+
+def test_the_history_shows_10_rows_by_default_in_the_same_order(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-01, EARS-H2-01"""
+    _add_history(db_session, admin_user, material, 23)
+
+    html = admin_client.get("/movements").text
+
+    assert _rows(html) == [f"fila{i:03d}" for i in range(23, 13, -1)]
+    assert "Mostrando 1–10 de 23" in html
+
+
+def test_the_page_size_selector_offers_the_four_options_and_marks_the_default(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H2-01"""
+    _add_history(db_session, admin_user, material, 12)
+
+    html = admin_client.get("/movements").text
+
+    assert "Filas por página" in html
+    for option in (10, 25, 50, 100):
+        assert f"per_page={option}" in " ".join(_links(html))
+    active = re.findall(r'<a class="is-active" href="[^"]*per_page=(\d+)', html)
+    assert active == ["10", "10"]  # the selector appears above and below
+
+
+@pytest.mark.parametrize("size", [25, 50, 100])
+def test_a_chosen_page_size_is_used(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+    size: int,
+) -> None:
+    """EARS-H1-01, EARS-H2-01"""
+    _add_history(db_session, admin_user, material, 120)
+
+    html = admin_client.get(f"/movements?per_page={size}").text
+
+    assert len(_rows(html)) == size
+    assert f"Mostrando 1–{size} de 120" in html
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "per_page=7",
+        "per_page=abc",
+        "per_page=-5",
+        "per_page=0",
+        "per_page=",
+        "page=abc",
+        "page=0",
+        "page=-3",
+        "page=2.5",
+        "page=abc&per_page=zzz",
+    ],
+)
+def test_a_garbage_page_or_page_size_means_the_defaults_without_an_error(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+    query: str,
+) -> None:
+    """EARS-H1-06"""
+    _add_history(db_session, admin_user, material, 23)
+
+    response = admin_client.get(f"/movements?{query}")
+
+    assert response.status_code == 200
+    assert _rows(response.text) == [f"fila{i:03d}" for i in range(23, 13, -1)]
+
+
+def test_a_page_past_the_end_shows_the_last_valid_page(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-05"""
+    _add_history(db_session, admin_user, material, 23)
+
+    response = admin_client.get("/movements?page=99")
+
+    assert response.status_code == 200
+    assert _rows(response.text) == ["fila003", "fila002", "fila001"]
+    assert "Mostrando 21–23 de 23" in response.text
+
+
+def test_the_second_page_continues_where_the_first_stopped(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-01"""
+    _add_history(db_session, admin_user, material, 23)
+
+    html = admin_client.get("/movements?page=2").text
+
+    assert _rows(html) == [f"fila{i:03d}" for i in range(13, 3, -1)]
+    assert "Mostrando 11–20 de 23" in html
+
+
+def test_rows_sharing_a_date_keep_a_stable_order_across_pages(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-01: the id breaks ties, so no row repeats or goes missing."""
+    for i in range(1, 16):
+        db_session.add(
+            Movement(
+                material_id=material.id,
+                user_id=admin_user.id,
+                type=MovementType.ENTRADA,
+                quantity=Decimal("1"),
+                movement_date=date(2026, 3, 1),
+                note=f"fila{i:03d}",
+            )
+        )
+    db_session.commit()
+
+    seen = _rows(admin_client.get("/movements?page=1").text) + _rows(
+        admin_client.get("/movements?page=2").text
+    )
+
+    assert sorted(seen) == [f"fila{i:03d}" for i in range(1, 16)]
+
+
+def test_the_controls_appear_above_and_below_the_table(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-02"""
+    _add_history(db_session, admin_user, material, 23)
+
+    html = admin_client.get("/movements?page=2").text
+
+    assert html.count('class="k-pager"') == 2
+    table = html.index('<table class="k-table">')
+    table_end = html.index("</table>")
+    first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
+    assert first < table
+    assert second > table_end
+    assert html.count("Mostrando 11–20 de 23") == 2
+
+
+def test_the_controls_are_there_for_the_operario_too(
+    operario_client: TestClient,
+    operario_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-02"""
+    _add_history(db_session, operario_user, material, 23)
+
+    html = operario_client.get("/movements").text
+
+    assert html.count('class="k-pager"') == 2
+    assert "Siguiente" in html
+
+
+def test_previous_and_next_are_disabled_at_the_ends(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-03"""
+    _add_history(db_session, admin_user, material, 23)
+
+    first = admin_client.get("/movements").text
+    middle = admin_client.get("/movements?page=2").text
+    last = admin_client.get("/movements?page=3").text
+
+    disabled = 'is-disabled" aria-disabled="true">'
+    assert first.count(f"{disabled}Anterior") == 2
+    assert first.count(f"{disabled}Siguiente") == 0
+    assert middle.count(disabled) == 0
+    assert last.count(f"{disabled}Siguiente") == 2
+    assert last.count(f"{disabled}Anterior") == 0
+    assert 'rel="next"' in middle and 'rel="prev"' in middle
+
+
+def test_a_single_page_disables_both_buttons_but_keeps_the_selector(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-03"""
+    _add_history(db_session, admin_user, material, 10)
+
+    html = admin_client.get("/movements").text
+
+    assert html.count('aria-disabled="true">Anterior') == 2
+    assert html.count('aria-disabled="true">Siguiente') == 2
+    assert "Filas por página" in html
+    assert "Mostrando 1–10 de 10" in html
+
+
+def test_an_empty_list_shows_the_empty_message_and_no_controls(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H1-04"""
+    html = admin_client.get("/movements").text
+
+    assert "Aún no hay movimientos" in html
+    assert "k-pager" not in html
+    assert "Filas por página" not in html
+
+
+def test_a_filter_without_results_shows_no_controls(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H1-04"""
+    _add_history(db_session, admin_user, material, 12)
+
+    html = admin_client.get("/movements?cobro=sin_precio").text
+
+    assert "Ningún movimiento coincide con ese filtro." in html
+    assert "k-pager" not in html
+
+
+def test_page_links_keep_every_active_filter(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H3-01"""
+    for i in range(1, 26):
+        db_session.add(
+            Movement(
+                material_id=material.id,
+                user_id=admin_user.id,
+                type=MovementType.SALIDA,
+                quantity=Decimal("1"),
+                movement_date=date(2026, 1, 1) + timedelta(days=i),
+                note=f"fila{i:03d}",
+                reason="venta",
+            )
+        )
+    db_session.commit()
+
+    html = admin_client.get(
+        f"/movements?material_id={material.id}&type=salida&cobro=sin_precio"
+    ).text
+
+    nxt = [link for link in _links(html) if "page=2" in link and "per_page=10" in link]
+    assert nxt, "no next-page link found"
+    for link in nxt:
+        assert f"material_id={material.id}" in link
+        assert "type=salida" in link
+        assert "cobro=sin_precio" in link
+
+
+def test_page_links_do_not_echo_unknown_or_invalid_parameters(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H3-01: only sanitised filters are carried."""
+    _add_history(db_session, admin_user, material, 23)
+
+    html = admin_client.get(
+        "/movements?evil=%3Cb%3Ezzmarker&type=bogus&cobro=x&material_id=zz&page=2"
+    ).text
+
+    assert "evil" not in html
+    assert "zzmarker" not in html
+    assert "bogus" not in html
+    assert "material_id=zz" not in html
+
+
+def test_changing_a_filter_goes_back_to_page_one_and_keeps_the_others(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H3-02"""
+    _add_history(db_session, admin_user, material, 60)
+
+    html = admin_client.get(f"/movements?page=3&material_id={material.id}").text
+
+    def query_of(link: str) -> dict[str, list[str]]:
+        return parse_qs(urlsplit(link).query)
+
+    toggles = [
+        query_of(link)
+        for link in _links(html)
+        if link.startswith("/movements?") and ("type" in link or "cobro" in link)
+    ]
+    assert toggles, "no filter links found"
+    for query in toggles:
+        assert "page" not in query
+        assert query["material_id"] == [str(material.id)]
+    # the material picker submits without a page field, so it restarts as well
+    form = html[html.index('<form method="get" action="/movements">') :]
+    form = form[: form.index("</form>")]
+    assert 'name="page"' not in form
+
+
+def test_choosing_a_page_size_keeps_the_filters_and_drops_the_page(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H2-02"""
+    _add_history(db_session, admin_user, material, 60)
+
+    html = admin_client.get(f"/movements?page=3&material_id={material.id}").text
+
+    size_links = [link for link in _links(html) if "per_page=50" in link]
+    assert size_links
+    for link in size_links:
+        assert f"material_id={material.id}" in link
+        assert "&page=" not in link and "?page=" not in link
+
+
+def test_choosing_a_size_sets_a_cookie_that_later_requests_use(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H2-03"""
+    _add_history(db_session, admin_user, material, 60)
+
+    chosen = admin_client.get("/movements?per_page=25")
+    assert "per_page=25" in chosen.headers["set-cookie"]
+
+    remembered = admin_client.get("/movements")
+    assert len(_rows(remembered.text)) == 25
+    assert "set-cookie" not in remembered.headers  # nothing new to remember
+
+
+def test_an_explicit_size_wins_over_the_cookie_and_replaces_it(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H2-03"""
+    _add_history(db_session, admin_user, material, 120)
+    admin_client.get("/movements?per_page=50")
+
+    explicit = admin_client.get("/movements?per_page=25&page=2")
+
+    assert len(_rows(explicit.text)) == 25
+    assert "per_page=25" in explicit.headers["set-cookie"]
+    assert len(_rows(admin_client.get("/movements").text)) == 25
+
+
+@pytest.mark.parametrize("bad", ["7", "abc", "-10", "0", "1000", ""])
+def test_an_invalid_cookie_is_ignored(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+    bad: str,
+) -> None:
+    """EARS-H2-04"""
+    _add_history(db_session, admin_user, material, 30)
+    admin_client.cookies.set("per_page", bad)
+
+    response = admin_client.get("/movements")
+
+    assert response.status_code == 200
+    assert len(_rows(response.text)) == 10
+
+
+def test_an_invalid_size_in_the_request_does_not_touch_the_cookie(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H2-03, EARS-H2-04"""
+    _add_history(db_session, admin_user, material, 30)
+
+    response = admin_client.get("/movements?per_page=7")
+
+    assert "set-cookie" not in response.headers
+
+
+def test_the_page_size_is_not_stored_in_the_database() -> None:
+    """EARS-H2-05"""
+    from skardex.models.base import Base
+
+    columns = {
+        column.name
+        for table in Base.metadata.tables.values()
+        for column in table.columns
+    }
+    assert not {name for name in columns if "per_page" in name or "page_size" in name}
+
+
+def test_the_cookie_is_remembered_per_browser_not_per_user(
+    operario_client: TestClient,
+    operario_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H2-03: it works for the operario too."""
+    _add_history(db_session, operario_user, material, 30)
+
+    operario_client.get("/movements?per_page=25")
+
+    assert len(_rows(operario_client.get("/movements").text)) == 25

@@ -18,6 +18,13 @@ from skardex.clock import today
 from skardex.db import get_db
 from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.money import InvalidMoneyError, parse_money
+from skardex.pagination import (
+    PER_PAGE_COOKIE,
+    paginate_query,
+    parse_page,
+    remember_per_page,
+    resolve_per_page,
+)
 from skardex.security import CurrentUser, require_admin
 from skardex.services.billing_service import (
     InvalidPriceError,
@@ -82,6 +89,8 @@ def list_movements(
     material_id: str = "",
     type_filter: str = Query("", alias="type"),
     cobro: str = "",
+    page: str = "",
+    per_page: str = "",
 ) -> Response:
     # Query param arrives as "" for the "Todos" option in the filter
     # <select>, which FastAPI can't coerce directly into int | None.
@@ -94,6 +103,7 @@ def list_movements(
     # The only supported value is "sin_precio"; anything else means no filter.
     selected_cobro = cobro if cobro in _VALID_COBROS else ""
 
+    # `id` breaks ties so a row never hops between pages from one load to the next.
     query = db.query(Movement).order_by(
         Movement.movement_date.desc(), Movement.id.desc()
     )
@@ -104,17 +114,33 @@ def list_movements(
     if selected_cobro:
         query = query.filter(*unpriced_sale_conditions())
 
-    return templates.TemplateResponse(
+    shown = paginate_query(
+        query,
+        page=parse_page(page),
+        per_page=resolve_per_page(per_page, request.cookies.get(PER_PAGE_COOKIE)),
+    )
+    response = templates.TemplateResponse(
         request,
         "movements/list.html",
         {
-            "movements": query.all(),
+            "movements": shown.items,
+            "pg": shown,
+            # Only the sanitised filters: page links must never echo raw input.
+            "params": {
+                "material_id": str(selected_material_id)
+                if selected_material_id
+                else "",
+                "type": selected_type,
+                "cobro": selected_cobro,
+            },
             "materials": db.query(Material).order_by(Material.name).all(),
             "selected_material_id": selected_material_id,
             "selected_type": selected_type,
             "selected_cobro": selected_cobro,
         },
     )
+    remember_per_page(response, per_page)
+    return response
 
 
 def _form_response(
