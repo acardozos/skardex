@@ -1,5 +1,4 @@
 from datetime import date as date_type
-from decimal import Decimal, InvalidOperation
 
 from fastapi import (
     APIRouter,
@@ -42,6 +41,7 @@ from skardex.services.kardex_service import (
     InsufficientStockError,
     InvalidQuantityError,
     get_balances_for_active_materials,
+    parse_quantity,
     register_movement,
 )
 from skardex.templating import templates
@@ -211,7 +211,7 @@ def create_movement(
             material=material,
             user=user,
             movement_type=MovementType(movement_type),
-            quantity=Decimal(quantity),
+            quantity=parse_quantity(quantity),
             movement_date=date_type.fromisoformat(movement_date),
             note=note or None,
             reason=reason or None,
@@ -224,7 +224,6 @@ def create_movement(
         InvalidReasonError,
         InvalidPriceError,
         InvalidMoneyError,
-        InvalidOperation,
         ValueError,
     ) as exc:
         return _form_response(

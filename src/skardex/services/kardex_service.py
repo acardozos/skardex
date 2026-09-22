@@ -1,12 +1,16 @@
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.services.billing_service import billing_fields_for
+
+# The column is `Numeric(12, 3)`: 9 integer digits, 3 decimals.
+MAX_QUANTITY = Decimal("999999999.999")
+_QUANTITY_LIMIT = Decimal("1000000000")
 
 
 @dataclass
@@ -26,6 +30,26 @@ class DashboardData:
 
 class InvalidQuantityError(Exception):
     """Raised when quantity is not strictly positive."""
+
+
+def parse_quantity(raw: str) -> Decimal:
+    """Parse a form value into a quantity fit to register.
+
+    Mirrors `money.parse_money`: rejects anything that is not a plain,
+    finite, strictly positive number, or too large for the `quantity`
+    column, always as `InvalidQuantityError` so the caller shows a single,
+    correct message instead of leaking a raw `decimal.InvalidOperation` (or
+    silently accepting `Infinity` as a "valid" quantity).
+    """
+    raw = raw.strip()
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        raise InvalidQuantityError(raw) from None
+
+    if not value.is_finite() or value <= 0 or value >= _QUANTITY_LIMIT:
+        raise InvalidQuantityError(raw)
+    return value
 
 
 class InactiveMaterialError(Exception):
@@ -149,7 +173,9 @@ def register_movement(
     if not material.is_active:
         raise InactiveMaterialError(material.id)
 
-    if quantity <= 0:
+    # Not just `<= 0`: a NaN comparison raises, and Infinity is otherwise a
+    # "valid" positive number that has no business being a quantity.
+    if not quantity.is_finite() or quantity <= 0:
         raise InvalidQuantityError(quantity)
 
     # An entrada has no reason or price, even if someone sends them.

@@ -124,6 +124,52 @@ def test_register_movement_with_non_positive_quantity_is_rejected(
     )
 
     assert response.status_code == 400
+    assert "La cantidad debe ser un número mayor a cero." in response.text
+
+
+@pytest.mark.parametrize(
+    "quantity",
+    ["abc", "12abc", "1,5", "-3", "NaN", "Infinity", "-Infinity", "1e30"],
+)
+def test_an_invalid_quantity_shows_the_right_message_not_the_date_one(
+    operario_client: TestClient, material: Material, quantity: str
+) -> None:
+    """T3: non-numeric quantities used to fall through to the router's
+    generic "invalid date" message, and Infinity was silently accepted as a
+    "valid" positive quantity (no error at all)."""
+    response = operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": quantity,
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "La cantidad debe ser un número mayor a cero." in response.text
+    assert "La fecha ingresada no es válida." not in response.text
+
+
+def test_an_invalid_quantity_keeps_the_balance_unchanged(
+    operario_client: TestClient, material: Material, db_session: Session
+) -> None:
+    before = get_balance(db_session, material.id)
+
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "Infinity",
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    assert get_balance(db_session, material.id) == before
 
 
 def test_filter_movements_by_material(
