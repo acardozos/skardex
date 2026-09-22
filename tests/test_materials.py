@@ -48,6 +48,7 @@ def test_operario_cannot_create_material(operario_client: TestClient) -> None:
 def test_admin_can_create_material(
     admin_client: TestClient, db_session: Session
 ) -> None:
+    """EARS-H3-01 (spec 001)."""
     response = admin_client.post(
         "/materials/new",
         data={"code": "CEM-1", "name": "Cemento", "unit": "kg", "min_stock": "10"},
@@ -59,11 +60,13 @@ def test_admin_can_create_material(
     assert material is not None
     assert material.code == "CEM-1"
     assert material.unit == "kg"
+    assert material.is_active is True
 
 
 def test_create_material_with_duplicate_code_is_rejected(
     admin_client: TestClient, db_session: Session
 ) -> None:
+    """EARS-H3-02 (spec 001)."""
     admin_client.post(
         "/materials/new",
         data={"code": "DUP-1", "name": "Arena", "unit": "kg", "min_stock": ""},
@@ -80,15 +83,70 @@ def test_create_material_with_duplicate_code_is_rejected(
     )
 
 
+def test_duplicate_code_is_rejected_even_against_an_inactive_material(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-02 (spec 001): "sea activo o inactivo" is explicit in the spec."""
+    admin_client.post(
+        "/materials/new",
+        data={"code": "DUP-2", "name": "Cal", "unit": "kg", "min_stock": ""},
+    )
+    material = db_session.query(Material).filter(Material.code == "DUP-2").first()
+    assert material is not None
+    admin_client.post(f"/materials/{material.id}/deactivate")
+
+    response = admin_client.post(
+        "/materials/new",
+        data={"code": "dup-2", "name": "Otra cal", "unit": "kg", "min_stock": ""},
+    )
+
+    assert response.status_code == 400
+    assert (
+        db_session.query(Material).filter(Material.name == "Otra cal").first() is None
+    )
+
+
 def test_create_material_with_invalid_unit_is_rejected(
     admin_client: TestClient,
 ) -> None:
+    """EARS-H3-01b (spec 001)."""
     response = admin_client.post(
         "/materials/new",
         data={"code": "", "name": "Cosa rara", "unit": "no-existe", "min_stock": ""},
     )
 
     assert response.status_code == 400
+
+
+def test_edit_material_with_invalid_unit_is_rejected(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-01b (spec 001): create is not the only place that validates it."""
+    admin_client.post(
+        "/materials/new",
+        data={
+            "code": "UNI-1",
+            "name": "Con unidad valida",
+            "unit": "kg",
+            "min_stock": "",
+        },
+    )
+    material = db_session.query(Material).filter(Material.code == "UNI-1").first()
+    assert material is not None
+
+    response = admin_client.post(
+        f"/materials/{material.id}/edit",
+        data={
+            "code": "UNI-1",
+            "name": "Con unidad valida",
+            "unit": "no-existe",
+            "min_stock": "",
+        },
+    )
+
+    assert response.status_code == 400
+    db_session.refresh(material)
+    assert material.unit == "kg"
 
 
 def test_create_material_with_negative_min_stock_is_rejected(
@@ -176,6 +234,35 @@ def test_admin_can_deactivate_material(
     assert material.is_active is False
 
 
+def test_deactivating_a_material_keeps_its_history_and_excludes_it_from_new_movements(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-03 (spec 001): the flag flip alone doesn't prove either effect."""
+    admin_client.post(
+        "/materials/new",
+        data={"code": "DEA-2", "name": "Con historial", "unit": "kg", "min_stock": ""},
+    )
+    material = db_session.query(Material).filter(Material.code == "DEA-2").first()
+    assert material is not None
+    admin_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "5",
+            "movement_date": "2026-01-15",
+            "note": "antes-de-desactivar",
+        },
+    )
+
+    admin_client.post(f"/materials/{material.id}/deactivate")
+
+    history = admin_client.get("/movements").text
+    assert "antes-de-desactivar" in history
+    new_form = admin_client.get("/movements/new").text
+    assert "Con historial" not in new_form
+
+
 def test_admin_can_reactivate_material(
     admin_client: TestClient, db_session: Session
 ) -> None:
@@ -194,6 +281,57 @@ def test_admin_can_reactivate_material(
     assert response.status_code == 303
     db_session.refresh(material)
     assert material.is_active is True
+
+
+def test_reactivating_a_material_makes_it_available_for_new_movements_again(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H3-05 (spec 001): the flag flip alone doesn't prove this."""
+    admin_client.post(
+        "/materials/new",
+        data={"code": "REA-3", "name": "De vuelta", "unit": "kg", "min_stock": ""},
+    )
+    material = db_session.query(Material).filter(Material.code == "REA-3").first()
+    assert material is not None
+    admin_client.post(f"/materials/{material.id}/deactivate")
+    assert "De vuelta" not in admin_client.get("/movements/new").text
+
+    admin_client.post(f"/materials/{material.id}/activate")
+
+    assert "De vuelta" in admin_client.get("/movements/new").text
+
+
+def test_operario_cannot_edit_or_deactivate_a_material(
+    operario_client: TestClient, material: Material
+) -> None:
+    """EARS-H3-04 (spec 001): create and reactivate are covered elsewhere;
+    edit and deactivate need their own checks."""
+    edit = operario_client.post(
+        f"/materials/{material.id}/edit",
+        data={
+            "code": material.code or "",
+            "name": "Forzado",
+            "unit": "kg",
+            "min_stock": "",
+        },
+    )
+    deactivate = operario_client.post(f"/materials/{material.id}/deactivate")
+
+    assert edit.status_code == 403
+    assert deactivate.status_code == 403
+
+
+def test_there_is_no_way_to_permanently_delete_a_material(
+    admin_client: TestClient, material: Material
+) -> None:
+    """EARS-H3-06 (spec 001): deactivating is the only way to retire one."""
+    delete_verb = admin_client.delete(f"/materials/{material.id}")
+    delete_route = admin_client.post(f"/materials/{material.id}/delete")
+
+    # `/materials/{id}` is not itself a route (only .../edit, .../deactivate
+    # and .../activate are), so a plain DELETE 404s rather than 405ing.
+    assert delete_verb.status_code == 404
+    assert delete_route.status_code == 404
 
 
 def test_operario_cannot_reactivate_material(

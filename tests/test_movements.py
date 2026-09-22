@@ -42,6 +42,7 @@ def test_movements_list_with_garbage_material_id_ignores_filter(
 def test_register_entrada_increases_balance(
     operario_client: TestClient, material: Material, db_session: Session
 ) -> None:
+    """EARS-H4-02 (spec 001)."""
     response = operario_client.post(
         "/movements/new",
         data={
@@ -56,6 +57,53 @@ def test_register_entrada_increases_balance(
 
     assert response.status_code == 303
     assert get_balance(db_session, material.id) == Decimal("10")
+
+
+def test_a_movement_is_stamped_with_the_user_who_registered_it(
+    operario_client: TestClient,
+    operario_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H4-01 (spec 001): automatic, and a forged `user_id` is ignored."""
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "10",
+            "movement_date": "2026-01-15",
+            "note": "",
+            "user_id": "999999",  # not a real field of the form; must be ignored
+        },
+    )
+
+    movement = db_session.query(Movement).one()
+    assert movement.user_id == operario_user.id
+
+
+def test_a_registered_movement_shows_up_immediately_in_history_and_dashboard(
+    operario_client: TestClient, material: Material
+) -> None:
+    """EARS-H4-04 (spec 001): the round trip, not just the stored balance."""
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "7",
+            "movement_date": "2026-01-15",
+            "note": "recien-registrado",
+        },
+    )
+
+    history = operario_client.get("/movements").text
+    dashboard = operario_client.get("/").text
+
+    assert "recien-registrado" in history
+    assert f"{material.name}" in dashboard
+    row = dashboard.split(f"{material.name}</td>")[1].split("</tr>")[0]
+    assert "7" in row
 
 
 def test_register_salida_decreases_balance(
@@ -92,21 +140,35 @@ def test_register_salida_decreases_balance(
 def test_register_salida_exceeding_balance_is_rejected(
     operario_client: TestClient, material: Material, db_session: Session
 ) -> None:
+    """EARS-H4-03 (spec 001): rejected, nothing persisted, and the message
+    states the actual balance available, not just a generic complaint."""
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "3",
+            "movement_date": "2026-01-14",
+            "note": "",
+        },
+    )
+
     response = operario_client.post(
         "/movements/new",
         data={
             "material_id": str(material.id),
             "movement_type": "salida",
             "reason": "otro",
-            "quantity": "1",
+            "quantity": "4",
             "movement_date": "2026-01-15",
             "note": "",
         },
     )
 
     assert response.status_code == 400
-    assert get_balance(db_session, material.id) == Decimal("0")
-    assert db_session.query(Movement).count() == 0
+    assert "disponible: 3" in response.text
+    assert get_balance(db_session, material.id) == Decimal("3")
+    assert db_session.query(Movement).count() == 1
 
 
 def test_register_movement_with_non_positive_quantity_is_rejected(
@@ -170,6 +232,33 @@ def test_an_invalid_quantity_keeps_the_balance_unchanged(
     )
 
     assert get_balance(db_session, material.id) == before
+
+
+def test_a_registered_movement_cannot_be_edited_or_deleted(
+    operario_client: TestClient, material: Material, db_session: Session
+) -> None:
+    """EARS-H6-03 (spec 001): no screen offers editing or deleting one."""
+    operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "quantity": "5",
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+    movement = db_session.query(Movement).one()
+
+    edit_form = operario_client.get(f"/movements/{movement.id}/edit")
+    edit_post = operario_client.post(f"/movements/{movement.id}/edit")
+    delete_verb = operario_client.delete(f"/movements/{movement.id}")
+    delete_route = operario_client.post(f"/movements/{movement.id}/delete")
+
+    assert edit_form.status_code == 404
+    assert edit_post.status_code == 404
+    assert delete_verb.status_code == 404
+    assert delete_route.status_code == 404
 
 
 def test_filter_movements_by_material(

@@ -31,8 +31,9 @@ def test_operario_cannot_create_user(operario_client: TestClient) -> None:
 
 
 def test_admin_can_create_operario(
-    admin_client: TestClient, db_session: Session
+    admin_client: TestClient, client: TestClient, db_session: Session
 ) -> None:
+    """EARS-H2-01 (spec 001)."""
     response = admin_client.post(
         "/users/new",
         data={"username": "nuevo1", "password": "pass1234"},
@@ -44,17 +45,44 @@ def test_admin_can_create_operario(
     assert created is not None
     assert created.role == "operario"
     assert created.is_active is True
+    # Stored as a hash, and the hash actually works: log in as the new user.
+    assert created.password_hash != "pass1234"
+    login = client.post(
+        "/login",
+        data={"username": "nuevo1", "password": "pass1234"},
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
 
 
 def test_create_user_with_duplicate_username_is_rejected(
     admin_client: TestClient, operario_user: User
 ) -> None:
+    """EARS-H2-06 (spec 001)."""
     response = admin_client.post(
         "/users/new",
         data={"username": operario_user.username, "password": "otra-pass"},
     )
 
     assert response.status_code == 400
+
+
+def test_duplicate_username_is_rejected_even_against_an_inactive_user(
+    admin_client: TestClient, operario_user: User, db_session: Session
+) -> None:
+    """EARS-H2-06 (spec 001): "activo o inactivo" is explicit in the spec."""
+    admin_client.post(f"/users/{operario_user.id}/deactivate")
+
+    response = admin_client.post(
+        "/users/new",
+        data={"username": operario_user.username, "password": "otra-pass"},
+    )
+
+    assert response.status_code == 400
+    assert (
+        db_session.query(User).filter(User.username == operario_user.username).count()
+        == 1
+    )
 
 
 def test_create_user_with_short_password_is_rejected(
@@ -79,7 +107,10 @@ def test_users_list_does_not_offer_deactivate_for_admin(
 
 
 def test_admin_can_deactivate_and_reactivate_operario(
-    admin_client: TestClient, operario_user: User, db_session: Session
+    admin_client: TestClient,
+    client: TestClient,
+    operario_user: User,
+    db_session: Session,
 ) -> None:
     response = admin_client.post(
         f"/users/{operario_user.id}/deactivate", follow_redirects=False
@@ -96,12 +127,63 @@ def test_admin_can_deactivate_and_reactivate_operario(
     assert operario_user.is_active is True
 
 
+def test_a_deactivated_operario_cannot_actually_log_in(
+    admin_client: TestClient, client: TestClient, operario_user: User
+) -> None:
+    """EARS-H2-02 (spec 001): the flag alone doesn't prove the login is
+    blocked; a real login attempt with the correct password must fail."""
+    admin_client.post(f"/users/{operario_user.id}/deactivate")
+
+    response = client.post(
+        "/login",
+        data={"username": operario_user.username, "password": "operario-pass"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_a_reactivated_operario_can_log_in_again(
+    admin_client: TestClient, client: TestClient, operario_user: User
+) -> None:
+    """EARS-H2-05 (spec 001): chained to an actual login, not just the flag."""
+    admin_client.post(f"/users/{operario_user.id}/deactivate")
+    admin_client.post(f"/users/{operario_user.id}/activate")
+
+    response = client.post(
+        "/login",
+        data={"username": operario_user.username, "password": "operario-pass"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+
+
+def test_operario_cannot_deactivate_or_reactivate_a_user(
+    operario_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H2-03 (spec 001): denied on every user-management route, not
+    just the list and the creation form."""
+    other = User(username="otro-operario", password_hash="x", role=UserRole.OPERARIO)
+    db_session.add(other)
+    db_session.commit()
+
+    deactivate = operario_client.post(f"/users/{other.id}/deactivate")
+    activate = operario_client.post(f"/users/{admin_user.id}/activate")
+
+    assert deactivate.status_code == 403
+    assert activate.status_code == 403
+    db_session.refresh(other)
+    assert other.is_active is True
+
+
 def test_cannot_deactivate_last_active_admin(
     admin_client: TestClient, admin_user: User, db_session: Session
 ) -> None:
+    """EARS-H2-04 (spec 001)."""
     response = admin_client.post(f"/users/{admin_user.id}/deactivate")
 
     assert response.status_code == 400
+    assert "No se puede desactivar la única cuenta admin activa." in response.text
     db_session.refresh(admin_user)
     assert admin_user.is_active is True
 
