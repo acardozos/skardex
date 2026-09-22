@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from skardex.db import get_db
 from skardex.models import UserRole
+from skardex.notices import PASSWORD_CHANGED_NOTICE_SESSION_KEY, pop_notice
 from skardex.pagination import (
     PER_PAGE_COOKIE,
     paginate_list,
@@ -48,6 +49,7 @@ def dashboard(
         "dashboard/index.html",
         {
             "user": user,
+            "notice": pop_notice(request, PASSWORD_CHANGED_NOTICE_SESSION_KEY),
             "items": data.items,
             "pg": shown,
             "params": {"q": q, "bajo_minimo": "1" if only_low else ""},

@@ -20,6 +20,10 @@
         {% endif %}
     </div>
 
+    {% if notice %}
+    <p class="k-banner k-banner--ok" id="account-notice">{{ notice }}</p>
+    {% endif %}
+
     <div class="k-kpis">
         <div class="k-kpi">
             <span class="k-kpi__value">{{ active_materials_count }}</span>

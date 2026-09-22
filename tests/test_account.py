@@ -30,6 +30,7 @@ def _change_password(
     current: str = "operario-pass",
     new: str = "brand-new-pass",
     confirm: str | None = None,
+    follow_redirects: bool = True,
 ) -> Response:
     return client.post(
         "/account/password",
@@ -38,6 +39,7 @@ def _change_password(
             "new_password": new,
             "confirm_password": new if confirm is None else confirm,
         },
+        follow_redirects=follow_redirects,
     )
 
 
@@ -140,6 +142,32 @@ def test_admin_can_change_own_password(
 
     assert response.status_code == 200
     assert "Contraseña actualizada" in response.text
+
+
+def test_change_password_success_redirects_to_the_dashboard(
+    operario_client: TestClient, operario_user: User
+) -> None:
+    """EARS-H1-06: a plain 200 here used to leave the form sitting on screen
+    next to the banner, as if nothing had happened, and a reload would
+    resubmit the password change."""
+    response = _change_password(operario_client, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/"
+
+
+def test_the_success_notice_shows_once_on_the_dashboard_and_does_not_repeat(
+    operario_client: TestClient, operario_user: User
+) -> None:
+    """EARS-H1-06"""
+    _change_password(operario_client, follow_redirects=False)
+
+    first = operario_client.get("/")
+    second = operario_client.get("/")
+
+    assert 'id="account-notice"' in first.text
+    assert "Contraseña actualizada" in first.text
+    assert "account-notice" not in second.text
 
 
 def _login(client: TestClient, user: User, password: str) -> Response:

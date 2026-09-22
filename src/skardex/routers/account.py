@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from skardex.db import get_db
 from skardex.models import User
+from skardex.notices import PASSWORD_CHANGED_NOTICE_SESSION_KEY, set_notice
 from skardex.security import CurrentUser, get_current_user_allow_pending
 from skardex.services.user_service import (
     MIN_PASSWORD_LENGTH,
@@ -62,9 +63,13 @@ def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    return templates.TemplateResponse(
-        request, "account/password.html", {"success": PASSWORD_CHANGED_MESSAGE}
-    )
+    # Redirect to Inicio instead of re-rendering the same form: a plain 200
+    # here used to leave the change-password form sitting on screen as if
+    # nothing had happened (and a reload would resubmit the change). The
+    # confirmation is a one-shot notice for Inicio to show. EARS-H1-06 (spec
+    # 003).
+    set_notice(request, PASSWORD_CHANGED_NOTICE_SESSION_KEY, PASSWORD_CHANGED_MESSAGE)
+    return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 
 def _redirect_home() -> RedirectResponse:

@@ -9,6 +9,11 @@ from typing import Any
 
 from fastapi import Request
 
+# Set by account.py (a successful own-password change), read by dashboard.py
+# (the redirect lands on Inicio, not back on the password form): a key shared
+# across two routers lives here instead of in either one.
+PASSWORD_CHANGED_NOTICE_SESSION_KEY = "password_changed_notice"
+
 
 def set_notice(request: Request, key: str, value: Any) -> None:
     request.session[key] = value
