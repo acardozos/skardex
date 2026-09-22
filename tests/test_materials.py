@@ -1,13 +1,17 @@
 import html as html_lib
 import re
+from collections.abc import Callable
 from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from sqlalchemy.orm import Session
 
 from skardex.models import Material, Movement, User
+
+MakeSale = Callable[..., Movement]
 
 
 def test_list_materials_requires_login(client: TestClient) -> None:
@@ -864,3 +868,130 @@ def test_the_catalog_remembers_the_size_it_is_given(
 
     assert "per_page=50" in chosen.headers["set-cookie"]
     assert len(_codes(admin_client.get("/materials").text)) == 50
+
+
+# --- one-shot notice when a reference price is set on an unpriced-sale
+# material (spec 004, EARS-H1-09 / backlog P1) ------------------------------
+
+
+def _edit(
+    client: TestClient, material: Material, *, sale_price: str = "", **fields: str
+) -> Response:
+    data = {
+        "code": material.code or "",
+        "name": material.name,
+        "unit": material.unit,
+        "min_stock": str(material.min_stock) if material.min_stock is not None else "",
+        "sale_price": sale_price,
+    }
+    data.update(fields)
+    return client.post(
+        f"/materials/{material.id}/edit", data=data, follow_redirects=False
+    )
+
+
+def test_setting_a_price_warns_once_about_this_materials_unpriced_sales(
+    admin_client: TestClient,
+    admin_user: User,
+    db_session: Session,
+    make_sale: MakeSale,
+) -> None:
+    material = Material(name="Tornillos", unit="unidad")
+    other = Material(name="Cable", unit="unidad")
+    db_session.add_all([material, other])
+    db_session.commit()
+    make_sale(user=admin_user, material=material, price=None)
+    make_sale(user=admin_user, material=material, price=None)
+    make_sale(user=admin_user, material=other, price=None)  # noise: another material
+
+    response = _edit(admin_client, material, sale_price="1500")
+    assert response.status_code == 303
+
+    html = admin_client.get("/materials").text
+    assert 'id="unpriced-price-notice"' in html
+    assert "Tornillos" in html
+    assert "2 ventas sin precio" in html
+    assert f"material_id={material.id}" in html
+    assert "Cable" not in html.split('id="unpriced-price-notice"')[1].split("</p>")[0]
+
+
+def test_the_notice_does_not_repeat_after_reloading(
+    admin_client: TestClient,
+    admin_user: User,
+    db_session: Session,
+    make_sale: MakeSale,
+) -> None:
+    material = Material(name="Tornillos", unit="unidad")
+    db_session.add(material)
+    db_session.commit()
+    make_sale(user=admin_user, material=material, price=None)
+
+    _edit(admin_client, material, sale_price="1500")
+    first = admin_client.get("/materials").text
+    second = admin_client.get("/materials").text
+
+    assert "unpriced-price-notice" in first
+    assert "unpriced-price-notice" not in second
+
+
+def test_no_notice_when_the_material_has_no_unpriced_sales(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    material = Material(name="Tornillos", unit="unidad")
+    db_session.add(material)
+    db_session.commit()
+
+    _edit(admin_client, material, sale_price="1500")
+
+    assert "unpriced-price-notice" not in admin_client.get("/materials").text
+
+
+def test_no_notice_when_the_price_did_not_change(
+    admin_client: TestClient,
+    admin_user: User,
+    db_session: Session,
+    make_sale: MakeSale,
+) -> None:
+    material = Material(name="Tornillos", unit="unidad", sale_price=Decimal("1500"))
+    db_session.add(material)
+    db_session.commit()
+    make_sale(user=admin_user, material=material, price=None)
+
+    # Re-save with the very same price, only touching another field.
+    _edit(admin_client, material, sale_price="1500", min_stock="3")
+
+    assert "unpriced-price-notice" not in admin_client.get("/materials").text
+
+
+def test_no_notice_when_the_price_is_cleared(
+    admin_client: TestClient,
+    admin_user: User,
+    db_session: Session,
+    make_sale: MakeSale,
+) -> None:
+    material = Material(name="Tornillos", unit="unidad", sale_price=Decimal("1500"))
+    db_session.add(material)
+    db_session.commit()
+    make_sale(user=admin_user, material=material, price=None)
+
+    _edit(admin_client, material, sale_price="")
+
+    assert "unpriced-price-notice" not in admin_client.get("/materials").text
+
+
+def test_the_notice_uses_the_singular_for_one_sale(
+    admin_client: TestClient,
+    admin_user: User,
+    db_session: Session,
+    make_sale: MakeSale,
+) -> None:
+    material = Material(name="Tornillos", unit="unidad")
+    db_session.add(material)
+    db_session.commit()
+    make_sale(user=admin_user, material=material, price=None)
+
+    _edit(admin_client, material, sale_price="1500")
+
+    html = admin_client.get("/materials").text
+    assert "1 venta sin precio" in html
+    assert "no la corrige" in html

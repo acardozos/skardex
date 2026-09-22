@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from skardex.db import get_db
 from skardex.models import User
+from skardex.notices import pop_notice, set_notice
 from skardex.security import require_admin
 from skardex.services.user_service import (
     MIN_PASSWORD_LENGTH,
@@ -21,8 +22,7 @@ from skardex.templating import templates
 
 router = APIRouter(prefix="/users")
 
-# One-shot hand-off of a freshly generated temporary password from the reset
-# POST to the redirected GET, so a page reload never repeats the reset.
+# See notices.py for the one-shot hand-off this key is used with.
 TEMP_PASSWORD_SESSION_KEY = "temp_password"
 
 
@@ -55,7 +55,7 @@ def list_users(
     context: dict[str, object] = {"users": users}
     headers: dict[str, str] = {}
 
-    reset = request.session.pop(TEMP_PASSWORD_SESSION_KEY, None)
+    reset = pop_notice(request, TEMP_PASSWORD_SESSION_KEY)
     if reset is not None:
         context["reset_username"] = reset["username"]
         context["temp_password"] = reset["password"]
@@ -149,8 +149,9 @@ def reset_password_route(
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    request.session[TEMP_PASSWORD_SESSION_KEY] = {
-        "username": user.username,
-        "password": temporary,
-    }
+    set_notice(
+        request,
+        TEMP_PASSWORD_SESSION_KEY,
+        {"username": user.username, "password": temporary},
+    )
     return RedirectResponse(url="/users", status_code=status.HTTP_303_SEE_OTHER)

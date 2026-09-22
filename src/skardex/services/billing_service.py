@@ -138,6 +138,10 @@ def count_unpriced_sales(db: Session) -> int:
     return _unpriced_sales_query(db).count()
 
 
+def count_unpriced_sales_for_material(db: Session, material_id: int) -> int:
+    return _unpriced_sales_query(db).filter(Movement.material_id == material_id).count()
+
+
 def pending_total(sales: Iterable[Movement]) -> Decimal:
     """Sum of each row's amount, already rounded, so the rows add up to it."""
     total = Decimal("0.00")

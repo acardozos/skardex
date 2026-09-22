@@ -22,6 +22,14 @@
         {% endif %}
     </div>
 
+    {% if unpriced_price_notice %}
+    {% set n = unpriced_price_notice.count %}
+    <p class="k-banner" id="unpriced-price-notice">
+        "{{ unpriced_price_notice.material_name }}" tiene {{ n }} venta{{ "s" if n != 1 else "" }} sin precio: fijar el precio de referencia no {{ "las" if n != 1 else "la" }} corrige, hay que corregir{{ "las" if n != 1 else "la" }} una por una.
+        <a href="/movements?material_id={{ unpriced_price_notice.material_id }}&amp;cobro=sin_precio">Ver las ventas sin precio</a>.
+    </p>
+    {% endif %}
+
     <div class="k-toolbar">
         <form method="get" action="/materials">
             <input type="hidden" name="estado" value="{{ estado }}">

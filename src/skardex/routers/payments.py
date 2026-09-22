@@ -8,6 +8,7 @@ from skardex.clock import today
 from skardex.db import get_db
 from skardex.models import Movement, User
 from skardex.money import format_cop
+from skardex.notices import pop_notice, set_notice
 from skardex.pagination import (
     PER_PAGE_COOKIE,
     Page,
@@ -34,9 +35,7 @@ router = APIRouter(prefix="/payments")
 
 _VALID_ESTADOS = {"pendientes", "pagados", "todos"}
 
-# One-shot confirmation handed from the POST to the redirected GET through the
-# session, so a reload never repeats the payment and the admin still sees what
-# was recorded (the app has no general flash-message mechanism).
+# See notices.py for the one-shot hand-off this key is used with.
 NOTICE_SESSION_KEY = "payment_notice"
 
 _INVALID_DATE_MESSAGE = "La fecha de pago no es válida."
@@ -108,7 +107,7 @@ def _screen(
             "pending_count": len(pending),
             "unpriced": list_unpriced_sales(db),
             "error": error,
-            "notice": request.session.pop(NOTICE_SESSION_KEY, None),
+            "notice": pop_notice(request, NOTICE_SESSION_KEY),
             "selected_ids": selected_ids,
             "selected_total": pending_total(chosen),
             "selected_count": len(chosen),
@@ -174,9 +173,11 @@ def register_payments(
 
     paid = db.query(Movement).filter(Movement.id.in_(set(movement_ids))).all()
     count = len(paid)
-    request.session[NOTICE_SESSION_KEY] = (
+    set_notice(
+        request,
+        NOTICE_SESSION_KEY,
         f"Se registró el pago de {count} venta{'s' if count != 1 else ''} "
         f"por {format_cop(pending_total(paid))} (fecha de pago: "
-        f"{paid_date.strftime('%d/%m/%Y')})."
+        f"{paid_date.strftime('%d/%m/%Y')}).",
     )
     return RedirectResponse(url="/payments", status_code=status.HTTP_303_SEE_OTHER)

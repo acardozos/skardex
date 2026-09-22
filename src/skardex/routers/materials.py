@@ -8,6 +8,7 @@ from skardex.constants import UNITS
 from skardex.db import get_db
 from skardex.models import Material, User
 from skardex.money import InvalidMoneyError, parse_money
+from skardex.notices import pop_notice, set_notice
 from skardex.pagination import (
     PER_PAGE_COOKIE,
     paginate_query,
@@ -16,6 +17,7 @@ from skardex.pagination import (
     resolve_per_page,
 )
 from skardex.security import CurrentUser, require_admin
+from skardex.services.billing_service import count_unpriced_sales_for_material
 from skardex.services.material_service import (
     DuplicateMaterialCodeError,
     InvalidMinStockError,
@@ -28,6 +30,9 @@ from skardex.services.material_service import (
 from skardex.templating import templates
 
 router = APIRouter(prefix="/materials")
+
+# See notices.py for the one-shot hand-off this key is used with.
+UNPRICED_PRICE_NOTICE_SESSION_KEY = "unpriced_price_notice"
 
 
 def _parse_min_stock(raw: str) -> Decimal | None:
@@ -115,6 +120,9 @@ def list_materials(
             "q": q,
             "estado": estado,
             "precio": precio,
+            "unpriced_price_notice": pop_notice(
+                request, UNPRICED_PRICE_NOTICE_SESSION_KEY
+            ),
         },
     )
     remember_per_page(response, per_page)
@@ -194,6 +202,7 @@ def update_material(
     sale_price: str = Form(""),
 ) -> Response:
     material = _get_material_or_404(db, material_id)
+    old_price = material.sale_price
 
     try:
         parsed_min_stock = _parse_min_stock(min_stock)
@@ -213,6 +222,23 @@ def update_material(
             {"units": UNITS, "material": material, "error": _error_message(exc)},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
+
+    # EARS-H1-09 (spec 004): a new reference price never touches sales already
+    # registered, so warn once if some of this material's are still unpriced.
+    # A brand-new material (create_material) cannot have any sale yet, so only
+    # an edit needs the check.
+    if material.sale_price is not None and material.sale_price != old_price:
+        unpriced = count_unpriced_sales_for_material(db, material.id)
+        if unpriced:
+            set_notice(
+                request,
+                UNPRICED_PRICE_NOTICE_SESSION_KEY,
+                {
+                    "material_id": material.id,
+                    "material_name": material.name,
+                    "count": unpriced,
+                },
+            )
 
     return RedirectResponse(url="/materials", status_code=status.HTTP_303_SEE_OTHER)
 
