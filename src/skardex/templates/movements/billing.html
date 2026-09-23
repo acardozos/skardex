@@ -52,7 +52,7 @@
                 <label class="k-label" for="reason">Motivo de la salida</label>
                 <select class="k-select" id="reason" name="reason" required>
                     <option value="" disabled {% if not form.get("reason") %}selected{% endif %}>Selecciona un motivo</option>
-                    {% for key, label in reason_labels.items() %}
+                    {% for key, label in salida_reasons.items() %}
                     <option value="{{ key }}" {% if form.get("reason") == key %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>

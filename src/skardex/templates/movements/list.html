@@ -63,8 +63,7 @@
                     <td data-label="Tipo"><span class="k-tag{{ ' k-tag--ok' if movement.type == 'entrada' else '' }}">{{ "Entrada" if movement.type == "entrada" else "Salida" }}</span></td>
                     <td data-label="Cantidad" class="k-num">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</td>
                     <td data-label="Motivo" class="k-dim">
-                        {%- if movement.type == "entrada" -%}-
-                        {%- elif movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
+                        {%- if movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
                         {%- else -%}Sin motivo{%- endif -%}
                     </td>
                     {% if movement.reason == "venta" and movement.unit_price is none %}

@@ -891,10 +891,30 @@ def test_history_shows_the_reason_of_every_salida(
         price = "1000" if key == "venta" else None
         _history_movement(db_session, admin_user, f"Mat {key}", reason=key, price=price)
     _history_movement(db_session, admin_user, "Mat vieja", reason=None, price=None)
+
+    html = admin_client.get("/movements").text
+
+    for key, label in SALIDA_REASONS.items():
+        assert f">{label}</td>" in _row(html, f"Mat {key}")
+    assert ">Sin motivo</td>" in _row(html, "Mat vieja")
+
+
+def test_history_shows_the_reason_of_a_new_entrada_and_sin_motivo_for_an_old_one(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H1-04, EARS-H1-05 (spec 006)."""
     _history_movement(
         db_session,
         admin_user,
-        "Mat entrada",
+        "Mat entrada nueva",
+        movement_type=MovementType.ENTRADA,
+        reason="compra",
+        price=None,
+    )
+    _history_movement(
+        db_session,
+        admin_user,
+        "Mat entrada vieja",
         movement_type=MovementType.ENTRADA,
         reason=None,
         price=None,
@@ -902,13 +922,8 @@ def test_history_shows_the_reason_of_every_salida(
 
     html = admin_client.get("/movements").text
 
-    for key, label in SALIDA_REASONS.items():
-        assert f">{label}</td>" in _row(html, f"Mat {key}")
-    assert ">Sin motivo</td>" in _row(html, "Mat vieja")
-    entrada_row = _row(html, "Mat entrada")
-    assert "Sin motivo" not in entrada_row
-    for label in SALIDA_REASONS.values():
-        assert f">{label}</td>" not in entrada_row
+    assert ">Compra</td>" in _row(html, "Mat entrada nueva")
+    assert ">Sin motivo</td>" in _row(html, "Mat entrada vieja")
 
 
 def test_history_shows_price_amount_and_status_only_for_priced_sales(

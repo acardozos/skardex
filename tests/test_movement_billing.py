@@ -236,6 +236,37 @@ def test_changing_a_sale_to_another_reason_removes_its_price(
     assert count_unpriced_sales(db_session) == 0
 
 
+def test_corregir_cobro_offers_ajuste_and_can_save_it(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale, db_session: Session
+) -> None:
+    """EARS-H2-01, EARS-H2-03 (spec 006)."""
+    sale = make_sale("Una", user=admin_user, price="1000")
+
+    html = admin_client.get(f"/movements/{sale.id}/billing").text
+    assert '<option value="ajuste"' in html
+
+    response = _post(admin_client, sale, "ajuste")
+
+    assert response.status_code == 303
+    db_session.refresh(sale)
+    assert sale.reason == "ajuste"
+    assert sale.unit_price is None
+
+
+def test_corregir_cobro_does_not_offer_entrada_only_reasons(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H2-03 (spec 006): this screen only corrects salidas, so it must
+    not offer compra/devolución (the merged label dict is for lookups only,
+    never for populating this <select> — see plan.md)."""
+    sale = make_sale("Una", user=admin_user, price="1000")
+
+    html = admin_client.get(f"/movements/{sale.id}/billing").text
+
+    assert '<option value="compra"' not in html
+    assert '<option value="devolucion"' not in html
+
+
 @pytest.mark.parametrize(
     ("reference", "reason", "price", "expected_reason", "expected_price"),
     [
