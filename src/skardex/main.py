@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
@@ -39,6 +39,13 @@ def create_app() -> FastAPI:
         https_only=settings.session_https_only,
     )
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> FileResponse:
+        # Browsers probe this exact path regardless of the <link rel="icon">
+        # tag in base.html; no login required, same as the static files.
+        return FileResponse(STATIC_DIR / "img" / "skardex.ico")
+
     app.include_router(account.router)
     app.include_router(auth.router)
     app.include_router(dashboard.router)

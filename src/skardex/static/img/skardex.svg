@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <defs>
+    <!-- Colores Box 1 (Inferior) -->
+    <linearGradient id="top1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#0ea5e9"/></linearGradient>
+    <linearGradient id="left1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0284c7"/><stop offset="100%" stop-color="#0369a1"/></linearGradient>
+    <linearGradient id="right1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0ea5e9"/><stop offset="100%" stop-color="#0284c7"/></linearGradient>
+    
+    <!-- Colores Box 2 (Superior) -->
+    <linearGradient id="top2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#bae6fd"/><stop offset="100%" stop-color="#7dd3fc"/></linearGradient>
+    <linearGradient id="left2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0ea5e9"/><stop offset="100%" stop-color="#0284c7"/></linearGradient>
+    <linearGradient id="right2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#0ea5e9"/></linearGradient>
+  </defs>
+
+  <!-- Box 1 (Caja inferior) -->
+  <path d="M 128 110 L 208 156 L 128 202 L 48 156 Z" fill="url(#top1)"/>
+  <path d="M 48 156 L 128 202 L 128 252 L 48 206 Z" fill="url(#left1)"/>
+  <path d="M 128 202 L 208 156 L 208 206 L 128 252 Z" fill="url(#right1)"/>
+  <path d="M 48 156 L 128 202 L 208 156" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+
+  <!-- Box 2 (Caja superior) -->
+  <path d="M 128 30 L 208 76 L 128 122 L 48 76 Z" fill="url(#top2)"/>
+  <path d="M 48 76 L 128 122 L 128 172 L 48 126 Z" fill="url(#left2)"/>
+  <path d="M 128 122 L 208 76 L 208 126 L 128 172 Z" fill="url(#right2)"/>
+  <path d="M 48 76 L 128 122 L 208 76" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+  <path d="M 128 122 L 128 172" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+</svg>

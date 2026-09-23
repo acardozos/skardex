@@ -8,6 +8,9 @@
       document.documentElement.dataset.theme = localStorage.getItem('kardex-theme') || '';
     </script>
     <link rel="stylesheet" href="{{ url_for('static', path='css/kardex.css') }}">
+    <link rel="icon" href="{{ url_for('static', path='img/skardex.ico') }}" sizes="any">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='img/skardex.svg') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', path='img/skardex.png') }}">
     <script src="https://unpkg.com/htmx.org@2" defer></script>
 </head>
 <body>

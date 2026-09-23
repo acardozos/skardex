@@ -11,6 +11,25 @@ def test_pages_serve_kardex_css_and_not_pico(operario_client: TestClient) -> Non
     assert "pico" not in response.text.lower()
 
 
+def test_pages_link_the_skardex_favicon(operario_client: TestClient) -> None:
+    html = operario_client.get("/").text
+
+    assert 'rel="icon" href="' in html
+    assert "/static/img/skardex.ico" in html
+    assert 'type="image/svg+xml"' in html
+    assert "/static/img/skardex.svg" in html
+    assert 'rel="apple-touch-icon"' in html
+    assert "/static/img/skardex.png" in html
+
+
+def test_favicon_ico_is_served_at_the_root_without_login(client: TestClient) -> None:
+    """Browsers probe /favicon.ico directly, regardless of any <link> tag."""
+    response = client.get("/favicon.ico")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/vnd.microsoft.icon"
+
+
 def test_nav_marks_current_route_as_active(admin_client: TestClient) -> None:
     dashboard_response = admin_client.get("/")
     materials_response = admin_client.get("/materials")
