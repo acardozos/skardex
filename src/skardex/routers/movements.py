@@ -193,10 +193,19 @@ def create_movement(
     quantity: str = Form(...),
     movement_date: str = Form(...),
     note: str = Form(""),
-    reason: str = Form(""),
+    reason: list[str] = Form(default=[]),
     unit_price: str = Form(""),
 ) -> Response:
     material = db.get(Material, material_id)
+    # The entrada and salida <select> share name="reason"; JavaScript disables
+    # whichever is not the active type, so only one value is normally sent.
+    # A browser without JavaScript would send both (entrada's first, since it
+    # comes first in the form) — this resolves that case correctly too,
+    # instead of silently taking whichever happens to be first.
+    if len(reason) >= 2:
+        reason_value = reason[1] if movement_type == "salida" else reason[0]
+    else:
+        reason_value = reason[0] if reason else ""
 
     try:
         if material is None:
@@ -214,7 +223,7 @@ def create_movement(
             quantity=parse_quantity(quantity),
             movement_date=date_type.fromisoformat(movement_date),
             note=note or None,
-            reason=reason or None,
+            reason=reason_value or None,
             unit_price=parsed_price,
         )
     except (
@@ -237,7 +246,7 @@ def create_movement(
                 "quantity": quantity,
                 "movement_date": movement_date,
                 "note": note,
-                "reason": reason,
+                "reason": reason_value,
                 "unit_price": unit_price,
             },
             status_code=status.HTTP_400_BAD_REQUEST,

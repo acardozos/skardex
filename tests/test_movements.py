@@ -87,6 +87,29 @@ def test_an_invalid_entrada_reason_is_rejected_and_nothing_is_persisted(
     assert get_balance(db_session, material.id) == before
 
 
+def test_when_both_reason_selects_are_submitted_the_active_types_wins(
+    operario_client: TestClient, material: Material, db_session: Session
+) -> None:
+    """A browser without JavaScript would send both entrada's and salida's
+    <select> (both name="reason"), entrada's first since it comes first in
+    the form. The type actually chosen must win, not whichever is first."""
+    response = operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "salida",
+            # entrada's value first, salida's second: the real DOM order.
+            "reason": ["compra", "venta"],
+            "quantity": "1",
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    assert response.status_code == 400  # rejected for a different reason:
+    assert "Saldo insuficiente" in response.text  # no stock, but "venta" won
+
+
 def test_register_entrada_increases_balance(
     operario_client: TestClient, material: Material, db_session: Session
 ) -> None:
@@ -501,16 +524,92 @@ def _last_movement(db: Session) -> Movement:
     return db.query(Movement).order_by(Movement.id.desc()).first()  # type: ignore[return-value]
 
 
-def test_form_offers_the_six_reasons_to_both_roles(
+def test_form_offers_every_entrada_and_salida_reason_to_both_roles(
     admin_client: TestClient, operario_client: TestClient
 ) -> None:
-    """EARS-H2-01"""
+    """EARS-H2-01 (spec 004); EARS-H1-01 presentation (spec 006)."""
     for client in (admin_client, operario_client):
         html = client.get("/movements/new").text
         assert 'name="reason"' in html
         for key, label in SALIDA_REASONS.items():
             assert f'<option value="{key}"' in html
             assert f">{label}</option>" in html
+        for key, label in ENTRADA_REASONS.items():
+            assert f'<option value="{key}"' in html
+            assert f">{label}</option>" in html
+
+
+def _entrada_select(html: str) -> str:
+    return html.split('id="reason-entrada"')[1].split("</select>")[0]
+
+
+def _salida_select(html: str) -> str:
+    return html.split('id="reason-salida"')[1].split("</select>")[0]
+
+
+def test_the_entrada_reason_defaults_to_compra_for_both_roles(
+    admin_client: TestClient, operario_client: TestClient
+) -> None:
+    """EARS-H3-01"""
+    for client in (admin_client, operario_client):
+        html = client.get("/movements/new").text
+        assert '<option value="compra" selected>' in _entrada_select(html)
+
+
+def test_the_salida_reason_defaults_to_venta_only_for_the_operario(
+    admin_client: TestClient, operario_client: TestClient
+) -> None:
+    """EARS-H3-02, EARS-H3-03"""
+    operario_html = operario_client.get("/movements/new").text
+    assert '<option value="venta" selected>' in _salida_select(operario_html)
+
+    admin_html = admin_client.get("/movements/new").text
+    admin_select = _salida_select(admin_html)
+    assert '<option value="" disabled selected>' in admin_select
+    assert "selected>" not in admin_select.replace(
+        '<option value="" disabled selected>', ""
+    )
+
+
+def test_a_rejected_entrada_keeps_the_reason_that_was_chosen_not_the_default(
+    operario_client: TestClient, material: Material
+) -> None:
+    """EARS-H3-04: the premarked default is not what gets shown back."""
+    response = operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "reason": "ajuste",
+            "quantity": "0",  # invalid on purpose, to force a 400 redisplay
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    assert response.status_code == 400
+    assert '<option value="ajuste" selected>' in _entrada_select(response.text)
+    assert '<option value="compra" selected>' not in _entrada_select(response.text)
+
+
+def test_a_rejected_salida_keeps_the_reason_an_admin_chose_not_the_placeholder(
+    admin_client: TestClient, material: Material
+) -> None:
+    """EARS-H3-04: an admin's deliberate choice survives a redisplay too."""
+    response = admin_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "salida",
+            "reason": "merma",
+            "quantity": "0",  # invalid on purpose, to force a 400 redisplay
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    assert response.status_code == 400
+    assert '<option value="merma" selected>' in _salida_select(response.text)
 
 
 def test_the_price_field_is_only_shown_to_the_admin(
