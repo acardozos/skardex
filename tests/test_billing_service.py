@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from skardex.clock import today
-from skardex.constants import MOVEMENT_REASONS
+from skardex.constants import SALIDA_REASONS
 from skardex.models import Material, Movement, MovementType, User
 from skardex.services.billing_service import (
     EmptySelectionError,
@@ -31,7 +31,7 @@ from skardex.services.kardex_service import (
     register_movement,
 )
 
-NON_SALE_REASONS = [key for key in MOVEMENT_REASONS if key != "venta"]
+NON_SALE_REASONS = [key for key in SALIDA_REASONS if key != "venta"]
 
 
 def _material(sale_price: str | None) -> Material:
@@ -63,7 +63,7 @@ def _register(
 
 
 def _stock(db: Session, material: Material, user: User, quantity: str = "100") -> None:
-    _register(db, material, user, MovementType.ENTRADA, quantity)
+    _register(db, material, user, MovementType.ENTRADA, quantity, reason="compra")
 
 
 # --- billing_fields_for (pure rules) -------------------------------------
@@ -172,10 +172,11 @@ def test_a_non_positive_reference_price_counts_as_no_price(reference: str) -> No
 # --- register_movement (stored result) -----------------------------------
 
 
-def test_entrada_never_stores_reason_or_price(
+def test_entrada_never_stores_a_price_even_if_one_is_forged(
     db_session: Session, admin_user: User
 ) -> None:
-    """EARS-H2-03"""
+    """EARS-H2-03 (spec 004): an entrada is never billed, whatever is sent.
+    Its reason IS stored (spec 006 changed that on purpose)."""
     material = _material("1000")
     db_session.add(material)
     db_session.commit()
@@ -186,11 +187,11 @@ def test_entrada_never_stores_reason_or_price(
         admin_user,
         MovementType.ENTRADA,
         "10",
-        reason="venta",
+        reason="compra",
         unit_price=Decimal("500"),
     )
 
-    assert movement.reason is None
+    assert movement.reason == "compra"
     assert movement.unit_price is None
     assert movement.paid_at is None
 
@@ -382,7 +383,7 @@ def test_old_movements_without_reason_are_left_untouched(
     assert legacy.paid_at is None
 
 
-@pytest.mark.parametrize("reason", list(MOVEMENT_REASONS))
+@pytest.mark.parametrize("reason", list(SALIDA_REASONS))
 def test_a_salida_larger_than_the_balance_is_rejected_with_any_reason(
     db_session: Session, admin_user: User, reason: str
 ) -> None:

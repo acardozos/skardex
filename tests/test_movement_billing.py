@@ -303,7 +303,7 @@ def test_an_invalid_reason_changes_nothing_and_shows_a_message(
     response = _post(admin_client, sale, bad_reason, "999")
 
     assert response.status_code == 400
-    assert "Indica el motivo de la salida." in response.text
+    assert "Indica el motivo del movimiento." in response.text
     db_session.refresh(sale)
     assert sale.reason == "venta"
     assert sale.unit_price == Decimal("1000.00")

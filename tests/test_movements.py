@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
 
-from skardex.constants import MOVEMENT_REASONS
+from skardex.constants import ENTRADA_REASONS, SALIDA_REASONS
 from skardex.models import Material, Movement, MovementType, User
 from skardex.services.kardex_service import get_balance
 
@@ -39,6 +39,54 @@ def test_movements_list_with_garbage_material_id_ignores_filter(
     assert response.status_code == 200
 
 
+@pytest.mark.parametrize("reason", list(ENTRADA_REASONS))
+def test_register_an_entrada_with_each_valid_reason(
+    operario_client: TestClient, material: Material, db_session: Session, reason: str
+) -> None:
+    """EARS-H1-01 (spec 006)."""
+    response = operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "reason": reason,
+            "quantity": "5",
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    movement = db_session.query(Movement).one()
+    assert movement.reason == reason
+
+
+@pytest.mark.parametrize("reason", ["", "venta", "consumo_interno", "regalo"])
+def test_an_invalid_entrada_reason_is_rejected_and_nothing_is_persisted(
+    operario_client: TestClient, material: Material, db_session: Session, reason: str
+) -> None:
+    """EARS-H1-02 (spec 006): a salida-only value is not valid for an entrada."""
+    before = get_balance(db_session, material.id)
+
+    response = operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "reason": reason,
+            "quantity": "5",
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "Indica el motivo del movimiento." in response.text
+    assert db_session.query(Movement).count() == 0
+    assert get_balance(db_session, material.id) == before
+
+
 def test_register_entrada_increases_balance(
     operario_client: TestClient, material: Material, db_session: Session
 ) -> None:
@@ -48,6 +96,7 @@ def test_register_entrada_increases_balance(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "10",
             "movement_date": "2026-01-15",
             "note": "",
@@ -71,6 +120,7 @@ def test_a_movement_is_stamped_with_the_user_who_registered_it(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "10",
             "movement_date": "2026-01-15",
             "note": "",
@@ -91,6 +141,7 @@ def test_a_registered_movement_shows_up_immediately_in_history_and_dashboard(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "7",
             "movement_date": "2026-01-15",
             "note": "recien-registrado",
@@ -114,6 +165,7 @@ def test_register_salida_decreases_balance(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "10",
             "movement_date": "2026-01-15",
             "note": "",
@@ -147,6 +199,7 @@ def test_register_salida_exceeding_balance_is_rejected(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "3",
             "movement_date": "2026-01-14",
             "note": "",
@@ -179,6 +232,7 @@ def test_register_movement_with_non_positive_quantity_is_rejected(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "0",
             "movement_date": "2026-01-15",
             "note": "",
@@ -204,6 +258,7 @@ def test_an_invalid_quantity_shows_the_right_message_not_the_date_one(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": quantity,
             "movement_date": "2026-01-15",
             "note": "",
@@ -225,6 +280,7 @@ def test_an_invalid_quantity_keeps_the_balance_unchanged(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "Infinity",
             "movement_date": "2026-01-15",
             "note": "",
@@ -243,6 +299,7 @@ def test_a_registered_movement_cannot_be_edited_or_deleted(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "5",
             "movement_date": "2026-01-15",
             "note": "",
@@ -274,6 +331,7 @@ def test_filter_movements_by_material(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "5",
             "movement_date": "2026-01-15",
             "note": "nota-cemento",
@@ -284,6 +342,7 @@ def test_filter_movements_by_material(
         data={
             "material_id": str(other_material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "3",
             "movement_date": "2026-01-15",
             "note": "nota-otro",
@@ -305,6 +364,7 @@ def test_filter_movements_by_type(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "10",
             "movement_date": "2026-01-15",
             "note": "nota-entrada",
@@ -342,6 +402,7 @@ def test_filter_movements_by_type_and_material_combined(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "10",
             "movement_date": "2026-01-15",
             "note": "nota-material-entrada",
@@ -352,6 +413,7 @@ def test_filter_movements_by_type_and_material_combined(
         data={
             "material_id": str(other_material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "5",
             "movement_date": "2026-01-15",
             "note": "nota-otro-entrada",
@@ -381,6 +443,7 @@ def test_new_movement_form_shows_balance_per_material(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "14",
             "movement_date": "2026-01-15",
             "note": "",
@@ -445,7 +508,7 @@ def test_form_offers_the_six_reasons_to_both_roles(
     for client in (admin_client, operario_client):
         html = client.get("/movements/new").text
         assert 'name="reason"' in html
-        for key, label in MOVEMENT_REASONS.items():
+        for key, label in SALIDA_REASONS.items():
             assert f'<option value="{key}"' in html
             assert f">{label}</option>" in html
 
@@ -472,23 +535,24 @@ def test_a_salida_without_a_valid_reason_is_rejected(
     response = _post_movement(operario_client, material, reason=reason)
 
     assert response.status_code == 400
-    assert "Indica el motivo de la salida." in response.text
+    assert "Indica el motivo del movimiento." in response.text
     assert db_session.query(Movement).count() == 1  # only the stock entrada
 
 
-def test_an_entrada_ignores_the_reason_and_price_that_are_sent(
+def test_an_entrada_never_stores_a_price_even_if_one_is_forged(
     admin_client: TestClient, db_session: Session
 ) -> None:
-    """EARS-H2-03"""
+    """EARS-H2-03 (spec 004): an entrada is never billed, whatever is sent.
+    Its reason IS stored (spec 006 changed that on purpose; see H1-01)."""
     material = _priced_material(db_session)
 
     response = _post_movement(
-        admin_client, material, "entrada", reason="venta", unit_price="500"
+        admin_client, material, "entrada", reason="compra", unit_price="500"
     )
 
     assert response.status_code == 303
     entrada = _last_movement(db_session)
-    assert entrada.reason is None
+    assert entrada.reason == "compra"
     assert entrada.unit_price is None
     assert entrada.paid_at is None
 
@@ -606,7 +670,7 @@ def test_a_sale_of_a_material_without_a_price_is_still_registered(
     assert sale.paid_at is None
 
 
-@pytest.mark.parametrize("reason", list(MOVEMENT_REASONS))
+@pytest.mark.parametrize("reason", list(SALIDA_REASONS))
 def test_over_http_a_salida_larger_than_the_balance_is_rejected_with_any_reason(
     operario_client: TestClient,
     operario_user: User,
@@ -724,7 +788,7 @@ def test_history_shows_the_reason_of_every_salida(
     admin_client: TestClient, admin_user: User, db_session: Session
 ) -> None:
     """EARS-H3-01"""
-    for key in MOVEMENT_REASONS:
+    for key in SALIDA_REASONS:
         price = "1000" if key == "venta" else None
         _history_movement(db_session, admin_user, f"Mat {key}", reason=key, price=price)
     _history_movement(db_session, admin_user, "Mat vieja", reason=None, price=None)
@@ -739,12 +803,12 @@ def test_history_shows_the_reason_of_every_salida(
 
     html = admin_client.get("/movements").text
 
-    for key, label in MOVEMENT_REASONS.items():
+    for key, label in SALIDA_REASONS.items():
         assert f">{label}</td>" in _row(html, f"Mat {key}")
     assert ">Sin motivo</td>" in _row(html, "Mat vieja")
     entrada_row = _row(html, "Mat entrada")
     assert "Sin motivo" not in entrada_row
-    for label in MOVEMENT_REASONS.values():
+    for label in SALIDA_REASONS.values():
         assert f">{label}</td>" not in entrada_row
 
 

@@ -6,12 +6,13 @@ from sqlalchemy import ColumnElement
 from sqlalchemy.orm import Query, Session
 
 from skardex.clock import today
-from skardex.constants import MOVEMENT_REASONS, SALE_REASON
+from skardex.constants import SALE_REASON, SALIDA_REASONS
 from skardex.models import Material, Movement, MovementType, User
 
 
 class InvalidReasonError(Exception):
-    """Raised when a salida has no reason or one outside MOVEMENT_REASONS."""
+    """Raised when a movement has no reason, or one outside the fixed list
+    for its type (SALIDA_REASONS here; ENTRADA_REASONS in kardex_service)."""
 
 
 class InvalidPriceError(Exception):
@@ -56,7 +57,7 @@ def billing_fields_for(
     without price" for the admin to fix later, so registering it is never
     blocked waiting for the admin.
     """
-    if reason not in MOVEMENT_REASONS:
+    if reason not in SALIDA_REASONS:
         raise InvalidReasonError(reason)
 
     if reason != SALE_REASON:

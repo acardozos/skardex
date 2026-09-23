@@ -67,6 +67,7 @@ def test_dashboard_low_stock_count_matches_number_of_low_materials(
         data={
             "material_id": str(ok_material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "5",
             "movement_date": "2026-01-15",
             "note": "",
@@ -104,6 +105,7 @@ def test_dashboard_movements_month_count_only_counts_current_month(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "1",
             "movement_date": today.isoformat(),
             "note": "",
@@ -114,6 +116,7 @@ def test_dashboard_movements_month_count_only_counts_current_month(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "1",
             "movement_date": last_month_date,
             "note": "",

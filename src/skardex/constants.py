@@ -49,13 +49,28 @@ UNIT_LABELS: dict[str, str] = {
 
 SALE_REASON = "venta"
 
+# Why an entrada happens. Never charged, never affects billing. Stored as
+# the key; the dict order is the order of its <select> in the movement form.
+ENTRADA_REASONS = {
+    "compra": "Compra",
+    "devolucion": "Devolución",
+    "ajuste": "Ajuste",
+    "otro": "Otro",
+}
+
 # Why a salida happens. Only sales are charged. Stored as the key; the dict
-# order is the order of the <select> in the movement form.
-MOVEMENT_REASONS = {
+# order is the order of its <select> in the movement form.
+SALIDA_REASONS = {
     "venta": "Venta",
     "consumo_interno": "Consumo interno",
     "merma": "Merma",
     "desperdicio": "Desperdicio",
     "muestra": "Muestra",
+    "ajuste": "Ajuste",
     "otro": "Otro",
 }
+
+# Label lookup only (history, "Corregir cobro"): never used to populate a
+# <select> directly, each type has its own list above. Safe to merge because
+# "ajuste"/"otro" share the same label on both sides.
+MOVEMENT_REASON_LABELS: dict[str, str] = {**ENTRADA_REASONS, **SALIDA_REASONS}

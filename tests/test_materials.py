@@ -249,6 +249,7 @@ def test_deactivating_a_material_keeps_its_history_and_excludes_it_from_new_move
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
+            "reason": "compra",
             "quantity": "5",
             "movement_date": "2026-01-15",
             "note": "antes-de-desactivar",
@@ -709,7 +710,7 @@ def test_changing_the_reference_price_does_not_change_registered_sales(
     admin_client.post("/materials/new", data=_material_data(sale_price="1000"))
     material = db_session.query(Material).one()
     for movement_type, quantity, reason in (
-        ("entrada", "10", ""),
+        ("entrada", "10", "compra"),
         ("salida", "4", "venta"),
     ):
         admin_client.post(

@@ -5,8 +5,9 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
+from skardex.constants import ENTRADA_REASONS
 from skardex.models import Material, Movement, MovementType, User, UserRole
-from skardex.services.billing_service import billing_fields_for
+from skardex.services.billing_service import InvalidReasonError, billing_fields_for
 
 # The column is `Numeric(12, 3)`: 9 integer digits, 3 decimals.
 MAX_QUANTITY = Decimal("999999999.999")
@@ -178,7 +179,7 @@ def register_movement(
     if not quantity.is_finite() or quantity <= 0:
         raise InvalidQuantityError(quantity)
 
-    # An entrada has no reason or price, even if someone sends them.
+    # An entrada never has a price, even if someone sends one.
     stored_reason: str | None = None
     stored_price: Decimal | None = None
 
@@ -192,6 +193,10 @@ def register_movement(
         current_balance = get_balance(db, material.id)
         if quantity > current_balance:
             raise InsufficientStockError(current_balance)
+    else:
+        if reason not in ENTRADA_REASONS:
+            raise InvalidReasonError(reason)
+        stored_reason = reason
 
     movement = Movement(
         material_id=material.id,
