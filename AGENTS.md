@@ -32,9 +32,9 @@ and business rules that aren't obvious from the code alone.
   → `models/` (SQLAlchemy). Keep business logic out of routers.
 - Alembic migrations are **hand-written**, one per schema change — never
   run `--autogenerate` against the real (Supabase) database.
-- Never point a local `.env` at the production database. Migrations and
-  the app's startup command change schema/data; running them from a
-  laptop against production can break the deployed app.
+- Never point a local `.env` at the production database — see
+  `README.md`'s "Never point your local `.env` at production" warning for
+  why and how to double-check it.
 
 ## Testing
 
