@@ -40,9 +40,11 @@ and business rules that aren't obvious from the code alone.
 
 - Tests run against an in-memory SQLite database — no real database needed.
 - Three separate `TestClient` fixtures — `client`, `admin_client`,
-  `operario_client` — each with its own client instance. **Never use two of
-  them in the same test**: they share session/cookie state and will
-  cross-contaminate.
+  `operario_client` — each with its own `TestClient` and cookie jar. They are
+  safe to combine in the same test; they only share the database, through
+  `_db_override`. See the regression test
+  `test_admin_client_and_operario_client_are_independent_sessions` in
+  `tests/test_base_layout.py`.
 - `make_sale` (in `tests/conftest.py`) is the factory for creating sales
   with or without a price, paid or not — prefer it over constructing a
   sale movement by hand.
