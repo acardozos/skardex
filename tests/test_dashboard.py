@@ -37,7 +37,7 @@ def test_dashboard_marks_material_below_min_stock(
     response = operario_client.get("/")
 
     assert response.status_code == 200
-    assert "1 material está por debajo de su stock mínimo" in response.text
+    assert "1 artículo está por debajo de su stock mínimo" in response.text
 
 
 def test_dashboard_does_not_mark_material_without_min_stock(
@@ -50,7 +50,7 @@ def test_dashboard_does_not_mark_material_without_min_stock(
     response = operario_client.get("/")
 
     assert response.status_code == 200
-    assert "Todos los materiales están sobre su stock mínimo." in response.text
+    assert "Todos los artículos están sobre su stock mínimo." in response.text
 
 
 def test_dashboard_low_stock_count_matches_number_of_low_materials(
@@ -77,7 +77,7 @@ def test_dashboard_low_stock_count_matches_number_of_low_materials(
     response = operario_client.get("/")
 
     assert response.status_code == 200
-    assert "1 material está por debajo de su stock mínimo" in response.text
+    assert "1 artículo está por debajo de su stock mínimo" in response.text
 
 
 def test_dashboard_active_materials_count(
@@ -91,7 +91,7 @@ def test_dashboard_active_materials_count(
     response = operario_client.get("/")
 
     assert response.status_code == 200
-    assert _kpi_value(response.text, "Materiales activos") == "2"
+    assert _kpi_value(response.text, "Artículos activos") == "2"
 
 
 def test_dashboard_movements_month_count_only_counts_current_month(
@@ -145,7 +145,7 @@ def test_dashboard_operario_sees_same_content_as_admin(
 
     assert admin_response.status_code == 200
     assert operario_response.status_code == 200
-    for expected in ("k-kpis", "k-alert", "Saldos por material", material.name):
+    for expected in ("k-kpis", "k-alert", "Saldos por artículo", material.name):
         assert expected in admin_response.text
         assert expected in operario_response.text
 
@@ -288,14 +288,14 @@ def _stock(db: Session, count: int, *, low: frozenset[int] = frozenset()) -> Non
 
 def _names(html: str) -> list[str]:
     """The materials of the balances table (not the alert chips), in order."""
-    return re.findall(r'data-label="Material" class="k-strong">(Mat\d{3})<', html)
+    return re.findall(r'data-label="Artículo" class="k-strong">(Mat\d{3})<', html)
 
 
 def _balances(html: str) -> dict[str, str]:
     return {
         name: balance
         for name, balance in re.findall(
-            r'data-label="Material" class="k-strong">(Mat\d{3})</td>.*?'
+            r'data-label="Artículo" class="k-strong">(Mat\d{3})</td>.*?'
             r'data-label="Saldo actual" class="k-num[^"]*">([^<]*)<',
             html,
             re.S,
@@ -376,13 +376,13 @@ def test_no_controls_when_there_are_no_materials_or_no_match(
 ) -> None:
     """EARS-H1-04"""
     empty = admin_client.get("/").text
-    assert "Aún no hay materiales" in empty
+    assert "Aún no hay artículos" in empty
     assert "k-pager" not in empty
 
     _stock(db_session, 12)
     none = admin_client.get("/?q=no-existe").text
-    assert "Ningún material coincide con ese filtro o búsqueda." in none
-    assert "Aún no hay materiales" not in none
+    assert "Ningún artículo coincide con ese filtro o búsqueda." in none
+    assert "Aún no hay artículos" not in none
     assert "k-pager" not in none
 
 
@@ -508,8 +508,8 @@ def test_the_alert_and_the_figures_ignore_the_page_and_the_filters(
         "/?per_page=100",
     ):
         html = admin_client.get(url).text
-        assert "4 materiales están por debajo de su stock mínimo" in html, url
-        assert _kpi_value(html, "Materiales activos") == "23", url
+        assert "4 artículos están por debajo de su stock mínimo" in html, url
+        assert _kpi_value(html, "Artículos activos") == "23", url
         assert _kpi_value(html, "Bajo stock mínimo") == "4", url
         for name in ("Mat020", "Mat021", "Mat022", "Mat023"):
             assert f'<div class="k-chip">{name}' in html, (url, name)

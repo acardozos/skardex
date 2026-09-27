@@ -17,9 +17,9 @@
         {% set chosen_type = form.get("movement_type", "entrada") %}
         <form class="k-form" method="post" action="/movements/new">
             <div class="k-field">
-                <label class="k-label" for="material_id">Material</label>
+                <label class="k-label" for="material_id">Artículo</label>
                 <select class="k-select" id="material_id" name="material_id" required>
-                    <option value="" disabled {% if not form.get("material_id") %}selected{% endif %}>Selecciona un material</option>
+                    <option value="" disabled {% if not form.get("material_id") %}selected{% endif %}>Selecciona un artículo</option>
                     {% for material in materials %}
                     {% set ref = material.sale_price if (material.sale_price is not none and material.sale_price > 0) else none %}
                     <option value="{{ material.id }}" data-price="{{ ref if ref is not none else '' }}" data-price-label="{{ (ref | cop) if ref is not none else '' }}" data-unit="{{ unit_labels.get(material.unit, material.unit) }}" {% if form.get("material_id") == material.id | string %}selected{% endif %}>{{ material.name }} · saldo {{ balances.get(material.id, 0) }} {{ unit_labels.get(material.unit, material.unit) }}</option>
@@ -145,9 +145,9 @@
         if (ref.price) {
           info.textContent = "Precio de referencia: " + ref.label + " por " + ref.unit + "." + (admin ? " Puedes cambiarlo." : "");
         } else if (admin) {
-          info.textContent = "Este material no tiene precio de referencia: indica el precio, o la venta quedará sin precio.";
+          info.textContent = "Este artículo no tiene precio de referencia: indica el precio, o la venta quedará sin precio.";
         } else {
-          info.textContent = "Este material no tiene precio de referencia: la venta se registrará sin precio y el administrador la completará.";
+          info.textContent = "Este artículo no tiene precio de referencia: la venta se registrará sin precio y el administrador la completará.";
         }
         info.style.display = "";
         // Prefill only when the material or the reason changed, not when the

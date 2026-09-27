@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}{% if material %}Editar material{% else %}Nuevo material{% endif %} — Simple Kardex{% endblock %}
+{% block title %}{% if material %}Editar artículo{% else %}Nuevo artículo{% endif %} — Simple Kardex{% endblock %}
 
 {% block content %}
 <main class="k-main">
     <div class="k-formcard">
         <div style="margin-bottom:20px">
             <p class="k-eyebrow">Catálogo</p>
-            <h1 style="font-size:22px">{% if material %}Editar material{% else %}Nuevo material{% endif %}</h1>
+            <h1 style="font-size:22px">{% if material %}Editar artículo{% else %}Nuevo artículo{% endif %}</h1>
         </div>
 
         {% if error %}

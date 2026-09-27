@@ -20,7 +20,7 @@
             <input type="hidden" name="type" value="{{ selected_type }}">
             <input type="hidden" name="cobro" value="{{ selected_cobro }}">
             <select class="k-select" name="material_id" onchange="this.form.submit()">
-                <option value="">Todos los materiales</option>
+                <option value="">Todos los artículos</option>
                 {% for material in materials %}
                 <option value="{{ material.id }}" {% if selected_material_id == material.id %}selected{% endif %}>{{ material.name }}</option>
                 {% endfor %}
@@ -43,7 +43,7 @@
             <thead>
                 <tr>
                     <th>Fecha</th>
-                    <th>Material</th>
+                    <th>Artículo</th>
                     <th>Tipo</th>
                     <th class="k-num">Cantidad</th>
                     <th>Motivo</th>
@@ -59,7 +59,7 @@
                 {% set fix_link %}{% if is_admin and movement.type == "salida" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}{% endset %}
                 <tr>
                     <td data-label="Fecha" class="k-dim">{{ movement.movement_date.strftime('%d/%m/%Y') }}</td>
-                    <td data-label="Material" class="k-strong">{{ movement.material.name }}</td>
+                    <td data-label="Artículo" class="k-strong">{{ movement.material.name }}</td>
                     <td data-label="Tipo"><span class="k-tag{{ ' k-tag--ok' if movement.type == 'entrada' else '' }}">{{ "Entrada" if movement.type == "entrada" else "Salida" }}</span></td>
                     <td data-label="Cantidad" class="k-num">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</td>
                     <td data-label="Motivo" class="k-dim">

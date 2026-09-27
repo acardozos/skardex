@@ -27,7 +27,7 @@ def test_operario_can_list_but_not_see_admin_actions(
     response = operario_client.get("/materials")
 
     assert response.status_code == 200
-    assert "Nuevo material" not in response.text
+    assert "Nuevo artículo" not in response.text
 
 
 def test_operario_cannot_access_new_material_form(operario_client: TestClient) -> None:
@@ -852,12 +852,12 @@ def test_the_catalog_shows_no_controls_when_there_is_nothing_to_list(
 ) -> None:
     """EARS-H1-04"""
     empty = admin_client.get("/materials").text
-    assert "Aún no hay materiales" in empty
+    assert "Aún no hay artículos" in empty
     assert "k-pager" not in empty
 
     _catalog(db_session, 12)
     filtered = admin_client.get("/materials?q=no-existe").text
-    assert "Ningún material coincide con ese filtro o búsqueda." in filtered
+    assert "Ningún artículo coincide con ese filtro o búsqueda." in filtered
     assert "k-pager" not in filtered
 
 

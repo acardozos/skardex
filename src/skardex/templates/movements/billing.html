@@ -17,7 +17,7 @@
         <div class="k-card" style="margin-bottom:20px">
             <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;padding:16px 20px">
                 <span class="k-label">Fecha</span><span>{{ movement.movement_date.strftime('%d/%m/%Y') }}</span>
-                <span class="k-label">Material</span><span class="k-strong">{{ movement.material.name }}</span>
+                <span class="k-label">Artículo</span><span class="k-strong">{{ movement.material.name }}</span>
                 <span class="k-label">Cantidad</span><span>{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
                 <span class="k-label">Registrada por</span><span>{{ movement.user.username }}</span>
                 <span class="k-label">Estado</span>
@@ -62,9 +62,9 @@
                 <input class="k-input" type="number" step="0.01" min="0.01" id="unit_price" name="unit_price" placeholder="0,00" value="{{ form.get('unit_price', '') }}">
                 <span class="k-help" id="reference-info">
                     {%- if reference_price is not none -%}
-                    Precio de referencia del material: {{ reference_price | cop }} por {{ unit_labels.get(movement.material.unit, movement.material.unit) }}. Si lo dejas vacío se usa ese.
+                    Precio de referencia del artículo: {{ reference_price | cop }} por {{ unit_labels.get(movement.material.unit, movement.material.unit) }}. Si lo dejas vacío se usa ese.
                     {%- else -%}
-                    El material no tiene precio de referencia: si lo dejas vacío, la venta queda sin precio.
+                    El artículo no tiene precio de referencia: si lo dejas vacío, la venta queda sin precio.
                     {%- endif -%}
                 </span>
             </div>

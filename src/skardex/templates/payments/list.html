@@ -62,7 +62,7 @@
                     <th><input type="checkbox" id="select-all" aria-label="Seleccionar todas" {% if selected_ids is none or selected_ids | length == sales | length %}checked{% endif %}></th>
                     {% endif %}
                     <th>Fecha</th>
-                    <th>Material</th>
+                    <th>Artículo</th>
                     <th class="k-num">Cantidad</th>
                     <th class="k-num">Precio unit.</th>
                     <th class="k-num">Monto</th>
@@ -80,7 +80,7 @@
                     <td data-label="Cobrar"><input type="checkbox" name="movement_ids" value="{{ sale.id }}" data-amount="{{ sale.amount }}" aria-label="Incluir esta venta en el pago" {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></td>
                     {% endif %}
                     <td data-label="Fecha" class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
-                    <td data-label="Material" class="k-strong">{{ sale.material.name }}</td>
+                    <td data-label="Artículo" class="k-strong">{{ sale.material.name }}</td>
                     <td data-label="Cantidad" class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
                     <td data-label="Precio unit." class="k-num">{{ sale.unit_price | cop }}</td>
                     <td data-label="Monto" class="k-num k-strong">{{ sale.amount | cop }}</td>
@@ -143,7 +143,7 @@
             <thead>
                 <tr>
                     <th>Fecha</th>
-                    <th>Material</th>
+                    <th>Artículo</th>
                     <th class="k-num">Cantidad</th>
                     <th>Observación</th>
                     {% if user.role == "admin" %}<th></th>{% endif %}
@@ -153,7 +153,7 @@
                 {% for sale in unpriced %}
                 <tr>
                     <td data-label="Fecha" class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
-                    <td data-label="Material" class="k-strong">{{ sale.material.name }}</td>
+                    <td data-label="Artículo" class="k-strong">{{ sale.material.name }}</td>
                     <td data-label="Cantidad" class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
                     <td data-label="Observación" class="k-dim k-cell--wide">{{ sale.note or "-" }}</td>
                     {% if user.role == "admin" %}

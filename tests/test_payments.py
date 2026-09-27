@@ -58,7 +58,7 @@ def test_pending_sales_are_listed_with_their_columns(
 
     for header in (
         "Fecha",
-        "Material",
+        "Artículo",
         "Cantidad",
         "Precio unit.",
         "Monto",

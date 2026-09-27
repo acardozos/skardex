@@ -27,7 +27,7 @@
     <div class="k-kpis">
         <div class="k-kpi">
             <span class="k-kpi__value">{{ active_materials_count }}</span>
-            <span class="k-kpi__label">Materiales activos</span>
+            <span class="k-kpi__label">Artículos activos</span>
         </div>
         <div class="k-kpi">
             <span class="k-kpi__value k-kpi__value--alert">{{ low_stock_count }}</span>
@@ -45,7 +45,7 @@
             <span class="k-alert__icon">⚠️</span>
             <div>
                 <p class="k-eyebrow">Atención</p>
-                <p class="k-alert__text">{{ low_stock_count }} material{{ "es" if low_stock_count != 1 else "" }} {{ "están" if low_stock_count != 1 else "está" }} por debajo de su stock mínimo.</p>
+                <p class="k-alert__text">{{ low_stock_count }} artículo{{ "s" if low_stock_count != 1 else "" }} {{ "están" if low_stock_count != 1 else "está" }} por debajo de su stock mínimo.</p>
             </div>
         </div>
         <div class="k-chips">
@@ -56,7 +56,7 @@
         <a class="k-btn k-btn--ghost k-btn--sm" id="low-stock-link" href="{{ page_url('/', {}, bajo_minimo='1') }}">Ver en la tabla de saldos</a>
     </div>
     {% else %}
-    <div class="k-ok"><span class="k-dot"></span> Todos los materiales están sobre su stock mínimo.</div>
+    <div class="k-ok"><span class="k-dot"></span> Todos los artículos están sobre su stock mínimo.</div>
     {% endif %}
 
     {% if unpriced_sales_count > 0 %}
@@ -86,13 +86,13 @@
 
     <div class="k-card">
         <div class="k-card__head">
-            <h2 class="k-card__title">Saldos por material</h2>
-            <span class="k-card__meta">{{ active_materials_count }} material{{ "es" if active_materials_count != 1 else "" }} activo{{ "s" if active_materials_count != 1 else "" }}</span>
+            <h2 class="k-card__title">Saldos por artículo</h2>
+            <span class="k-card__meta">{{ active_materials_count }} artículo{{ "s" if active_materials_count != 1 else "" }} activo{{ "s" if active_materials_count != 1 else "" }}</span>
         </div>
         <table class="k-table">
             <thead>
                 <tr>
-                    <th>Material</th>
+                    <th>Artículo</th>
                     <th>Unidad</th>
                     <th class="k-num">Saldo actual</th>
                     <th class="k-num">Stock mínimo</th>
@@ -102,7 +102,7 @@
             <tbody>
                 {% for item in pg.items %}
                 <tr>
-                    <td data-label="Material" class="k-strong">{{ item.material.name }}</td>
+                    <td data-label="Artículo" class="k-strong">{{ item.material.name }}</td>
                     <td data-label="Unidad" class="k-dim">{{ unit_labels.get(item.material.unit, item.material.unit) }}</td>
                     <td data-label="Saldo actual" class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance }}</td>
                     <td data-label="Stock mínimo" class="k-num k-dim">{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
@@ -117,11 +117,11 @@
             <span class="k-empty__icon">📦</span>
             {% if q or only_low %}
             <h3>Sin resultados</h3>
-            <p>Ningún material coincide con ese filtro o búsqueda.</p>
+            <p>Ningún artículo coincide con ese filtro o búsqueda.</p>
             {% else %}
-            <h3>Aún no hay materiales</h3>
-            <p>Crea tu primer material en el catálogo y los saldos aparecerán aquí.</p>
-            <a class="k-btn k-btn--primary" href="/materials">Ir a materiales</a>
+            <h3>Aún no hay artículos</h3>
+            <p>Crea tu primer artículo en el catálogo y los saldos aparecerán aquí.</p>
+            <a class="k-btn k-btn--primary" href="/materials">Ir a artículos</a>
             {% endif %}
         </div>
         {% endif %}

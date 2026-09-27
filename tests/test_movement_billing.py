@@ -173,10 +173,10 @@ def test_the_form_is_prefilled_and_explains_the_reference_price(
     html = admin_client.get(f"/movements/{with_price.id}/billing").text
     assert 'value="850.00"' in html
     assert re.search(r'<option value="venta"[^>]*\sselected>', html)
-    assert "Precio de referencia del material: $ 1.000,00 por kg" in html
+    assert "Precio de referencia del artículo: $ 1.000,00 por kg" in html
 
     html = admin_client.get(f"/movements/{without.id}/billing").text
-    assert "El material no tiene precio de referencia" in html
+    assert "El artículo no tiene precio de referencia" in html
 
 
 def test_setting_a_price_turns_a_sale_without_price_into_a_pending_one(
@@ -598,7 +598,7 @@ def test_an_unpriced_sale_opens_with_the_reference_price_already_in_the_field(
     html = admin_client.get(f"/movements/{sale.id}/billing").text
 
     assert _price_input_value(html) == "1000.00"
-    assert "Precio de referencia del material: $ 1.000,00 por kg" in html
+    assert "Precio de referencia del artículo: $ 1.000,00 por kg" in html
 
 
 def test_saving_the_prefilled_form_prices_the_sale_with_the_reference(

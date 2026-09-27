@@ -1,22 +1,22 @@
 {% extends "base.html" %}
 {% from "_pagination.html" import pager %}
 
-{% block title %}Materiales — Simple Kardex{% endblock %}
+{% block title %}Artículos — Simple Kardex{% endblock %}
 
 {% block content %}
 <main class="k-main">
     <div class="k-page-head">
         <div>
             <p class="k-eyebrow">Catálogo</p>
-            <h1>Materiales</h1>
+            <h1>Artículos</h1>
             {% if user.role == "admin" %}
-            <p>Materiales e insumos que puedes mover en el kardex.</p>
+            <p>Artículos que puedes mover en el kardex.</p>
             {% else %}
-            <p>Consulta los materiales disponibles y su unidad de medida.</p>
+            <p>Consulta los artículos disponibles y su unidad de medida.</p>
             {% endif %}
         </div>
         {% if user.role == "admin" %}
-        <a class="k-btn k-btn--primary" href="/materials/new">Nuevo material</a>
+        <a class="k-btn k-btn--primary" href="/materials/new">Nuevo artículo</a>
         {% else %}
         <span class="k-readonly"><span class="k-dot"></span> Solo lectura — el catálogo lo administra el dueño</span>
         {% endif %}
@@ -101,12 +101,12 @@
             <span class="k-empty__icon">📦</span>
             {% if q or estado != "activos" or precio == "sin" %}
             <h3>Sin resultados</h3>
-            <p>Ningún material coincide con ese filtro o búsqueda.</p>
+            <p>Ningún artículo coincide con ese filtro o búsqueda.</p>
             {% else %}
-            <h3>Aún no hay materiales</h3>
-            <p>El catálogo es la base del kardex: crea un material y luego podrás registrar sus entradas y salidas.</p>
+            <h3>Aún no hay artículos</h3>
+            <p>El catálogo es la base del kardex: crea un artículo y luego podrás registrar sus entradas y salidas.</p>
             {% if user.role == "admin" %}
-            <a class="k-btn k-btn--primary" href="/materials/new">Nuevo material</a>
+            <a class="k-btn k-btn--primary" href="/materials/new">Nuevo artículo</a>
             {% endif %}
             {% endif %}
         </div>

@@ -55,7 +55,7 @@ def _error_message(exc: Exception) -> str:
     if isinstance(exc, InvalidQuantityError):
         return "La cantidad debe ser un número mayor a cero."
     if isinstance(exc, InactiveMaterialError):
-        return "El material seleccionado no es válido."
+        return "El artículo seleccionado no es válido."
     if isinstance(exc, InvalidReasonError):
         return "Indica el motivo del movimiento."
     if isinstance(exc, InvalidPriceError | InvalidMoneyError):

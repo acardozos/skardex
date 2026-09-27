@@ -44,7 +44,7 @@ def _parse_min_stock(raw: str) -> Decimal | None:
 
 def _error_message(exc: Exception) -> str:
     if isinstance(exc, DuplicateMaterialCodeError):
-        return "Ya existe un material con ese código."
+        return "Ya existe un artículo con ese código."
     if isinstance(exc, InvalidUnitError):
         return "La unidad de medida no es válida."
     if isinstance(exc, InvalidSalePriceError | InvalidMoneyError):
