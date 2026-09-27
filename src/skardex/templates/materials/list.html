@@ -24,7 +24,7 @@
 
     {% if unpriced_price_notice %}
     {% set n = unpriced_price_notice.count %}
-    <p class="k-banner" id="unpriced-price-notice">
+    <p class="k-banner k-banner--warn" id="unpriced-price-notice">
         "{{ unpriced_price_notice.material_name }}" tiene {{ n }} venta{{ "s" if n != 1 else "" }} sin precio: fijar el precio de referencia no {{ "las" if n != 1 else "la" }} corrige, hay que corregir{{ "las" if n != 1 else "la" }} una por una.
         <a href="/movements?material_id={{ unpriced_price_notice.material_id }}&amp;cobro=sin_precio">Ver las ventas sin precio</a>.
     </p>
@@ -72,8 +72,8 @@
                     <td data-label="Nombre" class="k-strong">{{ material.name }}</td>
                     <td data-label="Unidad" class="k-dim">{{ unit_labels.get(material.unit, material.unit) }}</td>
                     <td data-label="Stock mínimo" class="k-num">{{ material.min_stock if material.min_stock is not none else "-" }}</td>
-                    <td data-label="Precio de venta" class="k-num">{% if material.sale_price is not none %}{{ material.sale_price | cop }}{% else %}<span class="k-tag">Sin precio</span>{% endif %}</td>
-                    <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if material.is_active else ' k-tag--muted' }}">{{ "Activo" if material.is_active else "Inactivo" }}</span></td>
+                    <td data-label="Precio de venta" class="k-num">{% if material.sale_price is not none %}{{ material.sale_price | cop }}{% else %}<span class="k-tag k-tag--warn">Sin precio</span>{% endif %}</td>
+                    <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if material.is_active else ' k-tag--neutral' }}">{{ "Activo" if material.is_active else "Inactivo" }}</span></td>
                     {% if user.role == "admin" %}
                     <td data-label="Acciones" class="k-cell--wide">
                         <div class="k-actions">

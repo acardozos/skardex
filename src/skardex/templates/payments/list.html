@@ -17,7 +17,7 @@
     <p class="k-banner k-banner--ok" id="payment-notice">{{ notice }}</p>
     {% endif %}
     {% if error %}
-    <p class="k-banner" id="payment-error">{{ error }}</p>
+    <p class="k-banner k-banner--danger" id="payment-error">{{ error }}</p>
     {% endif %}
 
     <div class="k-kpis">
@@ -39,7 +39,7 @@
 
     {% if unpriced %}
     {% set n = unpriced | length %}
-    <p class="k-banner" id="unpriced-notice">{{ n }} venta{{ "s" if n != 1 else "" }} sin precio no {{ "están incluidas" if n != 1 else "está incluida" }} en el total: hasta que se les fije el precio, el total está incompleto.</p>
+    <p class="k-banner k-banner--warn" id="unpriced-notice">{{ n }} venta{{ "s" if n != 1 else "" }} sin precio no {{ "están incluidas" if n != 1 else "está incluida" }} en el total: hasta que se les fije el precio, el total está incompleto.</p>
     {% endif %}
 
     <div class="k-toolbar">
@@ -99,12 +99,12 @@
         </table>
 
         {% if can_pay %}
-        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;padding:16px 20px;border-top:1px solid var(--border)">
+        <div class="k-paybar">
             <div>
                 <span class="k-label">Seleccionado</span>
                 <div><strong id="selected-total">{{ selected_total | cop }}</strong> <span class="k-dim" id="selected-count">{{ selected_count }} de {{ sales | length }} ventas</span></div>
             </div>
-            <div class="k-field" style="min-width:180px">
+            <div class="k-field k-paybar__date">
                 <label class="k-label" for="paid_on">Fecha de pago</label>
                 <input class="k-input" type="date" id="paid_on" name="paid_on" value="{{ paid_on or today }}" max="{{ today }}" required>
             </div>

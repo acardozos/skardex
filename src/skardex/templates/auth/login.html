@@ -13,7 +13,7 @@
 
         <div class="k-formcard">
             {% if error %}
-            <p class="k-banner">{{ error }}</p>
+            <p class="k-banner k-banner--danger">{{ error }}</p>
             {% endif %}
             <form class="k-form" method="post" action="/login">
                 <div class="k-field">
@@ -28,7 +28,7 @@
             </form>
         </div>
 
-        <p class="k-note" style="margin-top:18px">No hay registro público — las cuentas de operario las crea el administrador.</p>
+        <p class="k-note k-auth__foot">No hay registro público — las cuentas de operario las crea el administrador.</p>
     </div>
 </div>
 {% endblock %}

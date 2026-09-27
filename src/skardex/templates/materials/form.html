@@ -5,13 +5,13 @@
 {% block content %}
 <main class="k-main">
     <div class="k-formcard">
-        <div style="margin-bottom:20px">
+        <div class="k-formhead">
             <p class="k-eyebrow">Catálogo</p>
-            <h1 style="font-size:22px">{% if material %}Editar artículo{% else %}Nuevo artículo{% endif %}</h1>
+            <h1>{% if material %}Editar artículo{% else %}Nuevo artículo{% endif %}</h1>
         </div>
 
         {% if error %}
-        <p class="k-banner">{{ error }}</p>
+        <p class="k-banner k-banner--danger">{{ error }}</p>
         {% endif %}
 
         <form class="k-form" method="post" action="{% if material %}/materials/{{ material.id }}/edit{% else %}/materials/new{% endif %}">

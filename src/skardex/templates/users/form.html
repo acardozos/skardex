@@ -4,14 +4,14 @@
 
 {% block content %}
 <main class="k-main">
-    <div class="k-formcard" style="max-width:420px">
-        <div style="margin-bottom:20px">
+    <div class="k-formcard k-formcard--narrow">
+        <div class="k-formhead">
             <p class="k-eyebrow">Acceso</p>
-            <h1 style="font-size:22px">Nuevo operario</h1>
+            <h1>Nuevo operario</h1>
         </div>
 
         {% if error %}
-        <p class="k-banner">{{ error }}</p>
+        <p class="k-banner k-banner--danger">{{ error }}</p>
         {% endif %}
 
         <form class="k-form" method="post" action="/users/new">

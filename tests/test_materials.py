@@ -500,7 +500,7 @@ def test_operario_does_not_see_estado_filter_control(
 
 # --- reference sale price (spec 004, H1) ---------------------------------
 
-UNPRICED_TAG = '<span class="k-tag">Sin precio</span>'
+UNPRICED_TAG = '<span class="k-tag k-tag--warn">Sin precio</span>'
 
 
 def _material_data(**overrides: str) -> dict[str, str]:

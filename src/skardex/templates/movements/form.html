@@ -5,13 +5,13 @@
 {% block content %}
 <main class="k-main">
     <div class="k-formcard">
-        <div style="margin-bottom:20px">
+        <div class="k-formhead">
             <p class="k-eyebrow">Kardex</p>
-            <h1 style="font-size:22px">Registrar movimiento</h1>
+            <h1>Registrar movimiento</h1>
         </div>
 
         {% if error %}
-        <p class="k-banner">{{ error }}</p>
+        <p class="k-banner k-banner--danger">{{ error }}</p>
         {% endif %}
 
         {% set chosen_type = form.get("movement_type", "entrada") %}
@@ -29,7 +29,7 @@
 
             <div class="k-field">
                 <span class="k-label">Tipo de movimiento</span>
-                <div class="k-seg" style="display:grid;grid-template-columns:1fr 1fr;width:100%">
+                <div class="k-seg k-seg--split">
                     <label class="k-radio">
                         <input type="radio" name="movement_type" value="entrada" {% if chosen_type != "salida" %}checked{% endif %}>
                         <span class="k-btn k-btn--ghost k-btn--block">Entrada</span>

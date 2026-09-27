@@ -836,7 +836,7 @@ def test_the_form_defaults_to_an_entrada_with_todays_date_in_colombia(
 
 # --- history: reason, price, amount and billing status (spec 004, H3) ----
 
-UNPRICED_TAG = '<span class="k-tag">Sin precio</span>'
+UNPRICED_TAG = '<span class="k-tag k-tag--warn">Sin precio</span>'
 
 
 def _history_movement(

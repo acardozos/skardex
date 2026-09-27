@@ -14,14 +14,31 @@
     </div>
 
     {% if error %}
-    <p class="k-banner">{{ error }}</p>
+    <p class="k-banner k-banner--danger">{{ error }}</p>
     {% endif %}
     {% if temp_password %}
-    <div class="k-banner k-banner--ok" id="temp-password-banner">
-        <p style="margin:0 0 6px">Contraseña temporal de <strong>{{ reset_username }}</strong>:</p>
-        <p style="margin:0 0 6px"><code style="font-size:20px;letter-spacing:.1em;font-weight:600">{{ temp_password }}</code></p>
-        <p style="margin:0" class="k-dim">Cópiala y compártela ahora: no se volverá a mostrar. Sirve solo para el próximo ingreso, y esa persona deberá definir una contraseña propia.</p>
+    <div class="k-banner k-banner--warn k-secret" id="temp-password-banner">
+        <p>Contraseña temporal de <strong>{{ reset_username }}</strong>:</p>
+        <p class="k-secret__row">
+            <code class="k-secret__value">{{ temp_password }}</code>
+            {#- Shown only where the clipboard API exists (HTTPS, recent
+                browsers); otherwise the password is still there to copy by hand. -#}
+            <button type="button" class="k-btn k-btn--ghost k-btn--sm" data-copy="{{ temp_password }}" hidden>Copiar</button>
+        </p>
+        <p class="k-dim">Cópiala y compártela ahora: no se volverá a mostrar. Sirve solo para el próximo ingreso, y esa persona deberá definir una contraseña propia.</p>
     </div>
+    <script>
+      document.querySelectorAll("[data-copy]").forEach((button) => {
+        if (!navigator.clipboard) return;
+        button.hidden = false;
+        button.addEventListener("click", () => {
+          navigator.clipboard.writeText(button.dataset.copy).then(() => {
+            button.textContent = "Copiada";
+            setTimeout(() => { button.textContent = "Copiar"; }, 2000);
+          });
+        });
+      });
+    </script>
     {% endif %}
 
     <div class="k-card">
@@ -39,7 +56,7 @@
                 <tr>
                     <td data-label="Usuario" class="k-strong">{{ u.username }}</td>
                     <td data-label="Rol" class="k-dim">{{ "Admin" if u.role == "admin" else "Operario" }}</td>
-                    <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if u.is_active else ' k-tag--muted' }}">{{ "Activo" if u.is_active else "Inactivo" }}</span></td>
+                    <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if u.is_active else ' k-tag--neutral' }}">{{ "Activo" if u.is_active else "Inactivo" }}</span></td>
                     <td data-label="Acciones" class="k-cell--wide">
                         <div class="k-actions">
                             {% if u.role == "admin" %}

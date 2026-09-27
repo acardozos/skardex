@@ -5,17 +5,17 @@
 {% block content %}
 <main class="k-main">
     <div class="k-formcard">
-        <div style="margin-bottom:20px">
+        <div class="k-formhead">
             <p class="k-eyebrow">Cobro</p>
-            <h1 style="font-size:22px">Corregir cobro</h1>
+            <h1>Corregir cobro</h1>
         </div>
 
         {% if error %}
-        <p class="k-banner">{{ error }}</p>
+        <p class="k-banner k-banner--danger">{{ error }}</p>
         {% endif %}
 
-        <div class="k-card" style="margin-bottom:20px">
-            <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;padding:16px 20px">
+        <div class="k-card k-card--spaced">
+            <div class="k-facts">
                 <span class="k-label">Fecha</span><span>{{ movement.movement_date.strftime('%d/%m/%Y') }}</span>
                 <span class="k-label">Artículo</span><span class="k-strong">{{ movement.material.name }}</span>
                 <span class="k-label">Cantidad</span><span>{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
@@ -36,7 +36,7 @@
         </div>
 
         {% if movement.paid_at %}
-        <p class="k-note" style="margin-bottom:16px">Esta venta ya está pagada, así que su precio y su motivo no se pueden cambiar. Si el pago se marcó por error o hay que corregir el monto, primero deshaz el pago.</p>
+        <p class="k-note k-note--lead">Esta venta ya está pagada, así que su precio y su motivo no se pueden cambiar. Si el pago se marcó por error o hay que corregir el monto, primero deshaz el pago.</p>
         <div class="k-form__actions">
             <form method="post" action="/movements/{{ movement.id }}/undo-payment"
                   onsubmit="return confirm('¿Deshacer el pago de esta venta? Volverá a figurar como pendiente.');">
