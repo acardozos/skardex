@@ -177,8 +177,9 @@ def test_unpriced_sales_notices_are_amber(
     """EARS-H6-03 — same fact (sales without a price), same color everywhere."""
     sale = make_sale("Ladrillo", user=admin_user, price=None)
 
+    # Pagos says it with its amber counter; its separate notice is gone (H3-12).
     pagos = admin_client.get("/payments").text
-    assert _banner(pagos, "unpriced-notice") == "k-banner k-banner--warn"
+    assert '<span class="k-kpi__value k-kpi__value--alert">1</span>' in pagos
 
     catalog = admin_client.post(
         f"/materials/{sale.material_id}/edit",

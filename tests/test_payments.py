@@ -82,7 +82,7 @@ def test_the_total_adds_up_the_rounded_amount_of_each_row(
     html = admin_client.get("/payments").text
 
     assert _table(html, "sales-table").count("$ 0,01") == 3
-    assert '<span class="k-kpi__value">$ 0,03</span>' in html
+    assert '<span class="k-kpi__value k-kpi__value--money">$ 0,03</span>' in html
     assert "$ 0,02" not in html
 
 
@@ -101,7 +101,7 @@ def test_the_pending_is_global_and_not_split_by_person(
 
     assert "Del admin" in table
     assert "Del operario" in table
-    assert '<span class="k-kpi__value">$ 3.000,00</span>' in html
+    assert '<span class="k-kpi__value k-kpi__value--money">$ 3.000,00</span>' in html
     assert "Cliente" not in html
     assert "<th>Usuario</th>" not in table
 
@@ -116,9 +116,11 @@ def test_sales_without_price_are_flagged_and_listed_apart(
 
     html = admin_client.get("/payments").text
 
-    assert "2 ventas sin precio no están incluidas en el total" in html
-    assert "el total está incompleto" in html
+    # Spec 007 (H3-12): the separate notice is gone; the KPI label, the
+    # amber counter and the table below still say it.
+    assert 'id="unpriced-notice"' not in html
     assert "Total pendiente (sin contar las ventas sin precio)" in html
+    assert '<span class="k-kpi__value k-kpi__value--alert">2</span>' in html
     unpriced = _table(html, "unpriced-table")
     assert "Sin precio uno" in unpriced
     assert "Sin precio dos" in unpriced
@@ -126,10 +128,10 @@ def test_sales_without_price_are_flagged_and_listed_apart(
     assert "Sin precio uno" not in sales
     assert "Con precio" in sales
     # and the total only counts the priced sale
-    assert '<span class="k-kpi__value">$ 1.000,00</span>' in html
+    assert '<span class="k-kpi__value k-kpi__value--money">$ 1.000,00</span>' in html
 
 
-def test_the_notice_uses_the_singular_for_one_sale(
+def test_a_single_unpriced_sale_is_counted_without_a_separate_notice(
     admin_client: TestClient, admin_user: User, make_sale: MakeSale
 ) -> None:
     """EARS-H4-04"""
@@ -137,7 +139,9 @@ def test_the_notice_uses_the_singular_for_one_sale(
 
     html = admin_client.get("/payments").text
 
-    assert "1 venta sin precio no está incluida en el total" in html
+    # Spec 007 (H3-12): the counter carries the number; no separate notice.
+    assert '<span class="k-kpi__value k-kpi__value--alert">1</span>' in html
+    assert 'id="unpriced-notice"' not in html
 
 
 def test_there_is_no_notice_when_every_sale_has_a_price(
@@ -248,7 +252,7 @@ def test_the_headline_figures_are_always_about_what_is_pending(
     """EARS-H4-08: the paid tab still shows the pending total"""
     html = admin_client.get("/payments?estado=pagados").text
 
-    assert '<span class="k-kpi__value">$ 1.000,00</span>' in html
+    assert '<span class="k-kpi__value k-kpi__value--money">$ 1.000,00</span>' in html
     assert '<span class="k-kpi__value">1</span>' in html
 
 
@@ -267,7 +271,7 @@ def test_the_empty_state_shows_a_zero_total(
     html = admin_client.get(f"/payments?estado={estado}").text
 
     assert message in html
-    assert '<span class="k-kpi__value">$ 0,00</span>' in html
+    assert '<span class="k-kpi__value k-kpi__value--money">$ 0,00</span>' in html
 
 
 # --- registering a payment by selection (spec 004, H5) -------------------
@@ -912,3 +916,172 @@ def test_an_unpriced_sale_card_leaves_out_an_empty_note(
     )
     assert '<td class="k-dim k-c-note">para Juan</td>' in table
     assert '<td class="k-dim k-c-note is-empty">-</td>' in table
+
+
+# --- Spec 007, task 8: Pagos on touch screens --------------------------------
+
+
+def _cards(html: str) -> str:
+    start = html.index('id="sales-cards"')
+    return html[start : html.index("</ul>", start)]
+
+
+def _card_of(html: str, name: str) -> str:
+    found = [c for c in _cards(html).split('<li class="k-pcard"')[1:] if name in c]
+    assert len(found) == 1, f"expected one card for {name!r}, got {len(found)}"
+    return found[0].split("</li>")[0]
+
+
+def test_the_payment_date_comes_before_the_list(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-05 — so the fixed bar at the bottom fits on one line."""
+    make_sale("Ladrillo", user=admin_user)
+
+    html = admin_client.get("/payments").text
+
+    assert html.index('id="paid_on"') < html.index('id="sales-table"')
+    assert 'id="paid_on"' not in html[html.index('class="k-paybar"') :]
+
+
+def test_card_checkboxes_are_never_sent_and_arrive_disabled(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-07 — only the table's checkboxes carry `name`, so what is paid
+    is what the table holds; the card's twin only mirrors it (via script)."""
+    sale = make_sale("Ladrillo", user=admin_user)
+
+    cards = _cards(admin_client.get("/payments").text)
+
+    twin = re.search(r'<input type="checkbox" data-twin="(\d+)"[^>]*>', cards)
+    assert twin is not None and twin.group(1) == str(sale.id)
+    assert " disabled" in twin.group(0)
+    assert "name=" not in cards
+
+
+def test_a_sale_card_shows_item_amount_date_and_quantity_times_price(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-07"""
+    make_sale("Ladrillo", user=admin_user, quantity="3", price="1000", note="obra")
+
+    card = _card_of(admin_client.get("/payments").text, "Ladrillo")
+
+    assert '<span class="k-strong">Ladrillo</span>' in card
+    assert '<span class="k-num k-strong k-pcard__amount">$ 3.000,00</span>' in card
+    assert "<span>10/09/2026</span><span>3.000 kg × $ 1.000,00</span>" in card
+    assert '<p class="k-pcard__note">obra</p>' in card
+    assert "Corregir cobro" in card
+
+
+def test_the_card_shows_the_payment_state_only_outside_pendientes(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-08"""
+    make_sale("Ladrillo", user=admin_user)
+    make_sale("Varilla", user=admin_user, paid_on=date(2026, 9, 12))
+
+    pending = admin_client.get("/payments").text
+    everything = admin_client.get("/payments?estado=todos").text
+
+    assert "k-tag" not in _card_of(pending, "Ladrillo")
+    assert '<span class="k-tag">Pendiente</span>' in _card_of(everything, "Ladrillo")
+    paid = _card_of(everything, "Varilla")
+    assert '<span class="k-tag k-tag--ok">Pagada</span> 12/09/2026' in paid
+
+
+def test_select_all_exists_at_every_width_in_one_place_at_a_time(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-01, H3-09 — the table header's box and the fixed bar's box;
+    CSS shows the bar's only below 720px, where the table is hidden."""
+    make_sale("Ladrillo", user=admin_user)
+
+    html = admin_client.get("/payments").text
+    css = admin_client.get("/static/css/kardex.css").text
+
+    assert 'id="select-all" data-select-all' in html
+    assert 'id="select-all-bar" data-select-all' in html
+    assert html.index('class="k-paybar"') < html.index('id="select-all-bar"')
+    assert ".k-paybar__all{display:none" in css
+    narrow = css[css.index("@media (max-width:719.98px){\n  .k-table--sales") :]
+    narrow = narrow[: narrow.index("\n}")]
+    for rule in (
+        ".k-table--sales{display:none}",
+        ".k-pcards{display:block}",
+        ".k-paybar__all{display:inline-flex}",
+        "position:sticky;bottom:0",
+        "env(safe-area-inset-bottom)",
+    ):
+        assert rule in narrow, rule
+
+
+def test_only_the_admin_on_pendientes_gets_checkboxes_and_the_pay_bar(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-09 — Pagados and Todos are views, not something to pay."""
+    make_sale("Ladrillo", user=admin_user)
+    make_sale("Varilla", user=admin_user, paid_on=date(2026, 9, 12))
+
+    for estado in ("pagados", "todos"):
+        html = admin_client.get(f"/payments?estado={estado}").text
+        assert 'id="sales-cards"' in html, estado
+        assert "data-twin" not in html and "k-paybar" not in html, estado
+
+
+def test_the_operario_sees_cards_without_selection(
+    operario_client: TestClient, operario_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-09"""
+    make_sale("Ladrillo", user=operario_user)
+
+    html = operario_client.get("/payments").text
+
+    assert 'id="sales-cards"' in html
+    assert "data-twin" not in html and "k-paybar" not in html
+    assert "Corregir cobro" not in _card_of(html, "Ladrillo")
+
+
+def test_a_repeated_id_pays_that_sale_once(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale, db_session: Session
+) -> None:
+    """EARS-H3-13 — a guard for the de-duplication the page's design leans on."""
+    sale = make_sale("Ladrillo", user=admin_user)
+
+    html = admin_client.post(
+        "/payments/register",
+        data={"movement_ids": [str(sale.id), str(sale.id)], "paid_on": "2026-09-12"},
+    ).text
+
+    db_session.refresh(sale)
+    assert sale.paid_at == date(2026, 9, 12)
+    assert "Se registró el pago de 1 venta por $ 1.000,00" in html
+
+
+def test_a_long_total_shrinks_to_fit_its_card(admin_client: TestClient) -> None:
+    """Finding of 2026-09-27: a large amount overflowed the KPI card. The plain
+    36px is the fallback for browsers without container units."""
+    html = admin_client.get("/payments").text
+    css = admin_client.get("/static/css/kardex.css").text
+
+    assert 'class="k-kpi__value k-kpi__value--money"' in html
+    assert ".k-kpi{container-type:inline-size}" in css
+    assert (
+        ".k-kpi__value--money{font-size:36px;font-size:clamp(20px,10cqi,36px);"
+    ) in css
+
+
+def test_the_fixed_bar_keeps_its_middle_block_to_two_lines(
+    admin_client: TestClient,
+) -> None:
+    """Found by the user on a 412px-wide phone: the total, its caption and the
+    count wrapped to four lines. Below 720px the caption is kept for screen
+    readers only, the total never wraps and the count goes underneath."""
+    css = admin_client.get("/static/css/kardex.css").text
+    narrow = css[css.index("@media (max-width:719.98px){\n  .k-table--sales") :]
+    narrow = narrow[: narrow.index("\n}")]
+
+    assert "#selected-total{white-space:nowrap}" in css
+    assert ".k-paybar__sum .k-label{position:absolute;width:1px;height:1px" in narrow
+    assert "#selected-total{font-size:15px;font-size:clamp(12px,10cqi,15px)}" in narrow
+    assert "#selected-count{display:block;font-size:12px;white-space:nowrap}" in narrow

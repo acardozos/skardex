@@ -22,7 +22,7 @@
 
     <div class="k-kpis">
         <div class="k-kpi">
-            <span class="k-kpi__value">{{ pending_total | cop }}</span>
+            <span class="k-kpi__value k-kpi__value--money">{{ pending_total | cop }}</span>
             <span class="k-kpi__label">Total pendiente{% if unpriced %} (sin contar las ventas sin precio){% endif %}</span>
         </div>
         <div class="k-kpi">
@@ -37,11 +37,6 @@
         {% endif %}
     </div>
 
-    {% if unpriced %}
-    {% set n = unpriced | length %}
-    <p class="k-banner k-banner--warn" id="unpriced-notice">{{ n }} venta{{ "s" if n != 1 else "" }} sin precio no {{ "están incluidas" if n != 1 else "está incluida" }} en el total: hasta que se les fije el precio, el total está incompleto.</p>
-    {% endif %}
-
     <div class="k-toolbar">
         <nav class="k-seg">
             <a class="{% if estado == 'pendientes' %}is-active{% endif %}" href="/payments?estado=pendientes">Pendientes</a>
@@ -53,13 +48,23 @@
     {% if pg %}{{ pager_summary(pg) }}{% endif %}
 
     {% set can_pay = user.role == "admin" and estado == "pendientes" and sales %}
-    {% if can_pay %}<form method="post" action="/payments/register" id="payment-form">{% endif %}
+    {% set all_checked = selected_ids is none or selected_ids | length == sales | length %}
+    {% if can_pay %}
+    <form class="k-payform" method="post" action="/payments/register" id="payment-form">
+        {#- First, so the fixed bar at the bottom fits on one line. -#}
+        <div class="k-field k-paydate">
+            <label class="k-label" for="paid_on">Fecha de pago</label>
+            <input class="k-input" type="date" id="paid_on" name="paid_on" value="{{ paid_on or today }}" max="{{ today }}" required>
+        </div>
+    {% endif %}
     <div class="k-card">
-        <table class="k-table k-table--stacked" id="sales-table">
+        {#- 720px and up: the table. Its checkboxes are the only ones that are
+            sent (`name="movement_ids"`), even while CSS hides the table. -#}
+        <table class="k-table k-table--sales" id="sales-table">
             <thead>
                 <tr>
                     {% if can_pay %}
-                    <th><input type="checkbox" id="select-all" aria-label="Seleccionar todas" {% if selected_ids is none or selected_ids | length == sales | length %}checked{% endif %}></th>
+                    <th><label class="k-pick"><input type="checkbox" id="select-all" data-select-all aria-label="Seleccionar todas" {% if all_checked %}checked{% endif %}></label></th>
                     {% endif %}
                     <th>Fecha</th>
                     <th>Artículo</th>
@@ -75,42 +80,61 @@
             </thead>
             <tbody>
                 {% for sale in sales %}
-                <tr>
+                <tr{% if can_pay %} data-select-row{% endif %}>
                     {% if can_pay %}
-                    <td data-label="Cobrar"><input type="checkbox" name="movement_ids" value="{{ sale.id }}" data-amount="{{ sale.amount }}" aria-label="Incluir esta venta en el pago" {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></td>
+                    <td><label class="k-pick"><input type="checkbox" name="movement_ids" value="{{ sale.id }}" data-amount="{{ sale.amount }}" aria-label="Incluir esta venta en el pago" {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></label></td>
                     {% endif %}
-                    <td data-label="Fecha" class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
-                    <td data-label="Artículo" class="k-strong">{{ sale.material.name }}</td>
-                    <td data-label="Cantidad" class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
-                    <td data-label="Precio unit." class="k-num">{{ sale.unit_price | cop }}</td>
-                    <td data-label="Monto" class="k-num k-strong">{{ sale.amount | cop }}</td>
+                    <td class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
+                    <td class="k-strong">{{ sale.material.name }}</td>
+                    <td class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
+                    <td class="k-num">{{ sale.unit_price | cop }}</td>
+                    <td class="k-num k-strong">{{ sale.amount | cop }}</td>
                     {% if estado != "pendientes" %}
-                    <td data-label="Pago">
+                    <td>
                         {% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ sale.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
                     </td>
                     {% endif %}
-                    <td data-label="Observación" class="k-dim k-cell--wide">{{ sale.note or "-" }}</td>
+                    <td class="k-dim">{{ sale.note or "-" }}</td>
                     {% if user.role == "admin" %}
-                    <td data-label="Acciones"><a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a></td>
+                    <td><a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a></td>
                     {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
 
-        {% if can_pay %}
-        <div class="k-paybar">
-            <div>
-                <span class="k-label">Seleccionado</span>
-                <div><strong id="selected-total">{{ selected_total | cop }}</strong> <span class="k-dim" id="selected-count">{{ selected_count }} de {{ sales | length }} ventas</span></div>
-            </div>
-            <div class="k-field k-paybar__date">
-                <label class="k-label" for="paid_on">Fecha de pago</label>
-                <input class="k-input" type="date" id="paid_on" name="paid_on" value="{{ paid_on or today }}" max="{{ today }}" required>
-            </div>
-            <button type="submit" class="k-btn k-btn--primary">Registrar pago</button>
-        </div>
-        {% endif %}
+        {#- Below 720px: one card per sale. Its checkbox has no name, so it is
+            never sent: it arrives disabled, showing the same state as its
+            twin in the table, and the script below enables it and mirrors
+            every change into that twin. What is paid is always what is seen,
+            with or without JavaScript. -#}
+        <ul class="k-pcards" id="sales-cards">
+            {% for sale in sales %}
+            <li class="k-pcard"{% if can_pay %} data-select-row{% endif %}>
+                <div class="k-pcard__main">
+                    {% if can_pay %}
+                    <label class="k-pick"><input type="checkbox" data-twin="{{ sale.id }}" aria-label="Incluir esta venta en el pago" disabled {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></label>
+                    {% endif %}
+                    <span class="k-strong">{{ sale.material.name }}</span>
+                    <span class="k-num k-strong k-pcard__amount">{{ sale.amount | cop }}</span>
+                </div>
+                <p class="k-pcard__meta k-meta">
+                    <span>{{ sale.movement_date.strftime('%d/%m/%Y') }}</span>
+                    {#- -#}
+                    <span>{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }} × {{ sale.unit_price | cop }}</span>
+                    {%- if estado != "pendientes" -%}
+                    <span>{% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> {{ sale.paid_at.strftime('%d/%m/%Y') }}{% else %}<span class="k-tag">Pendiente</span>{% endif %}</span>
+                    {%- endif -%}
+                </p>
+                {% if sale.note or user.role == "admin" %}
+                <div class="k-pcard__foot">
+                    {% if sale.note %}<p class="k-pcard__note">{{ sale.note }}</p>{% endif %}
+                    {% if user.role == "admin" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
+                </div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
 
         {% if not sales %}
         <div class="k-empty">
@@ -129,7 +153,21 @@
         {% endif %}
     </div>
 
-    {% if can_pay %}</form>{% endif %}
+    {% if can_pay %}
+        {#- Outside .k-card on purpose: the card scrolls sideways, which would
+            make it the bar's scroll container and keep the bar from sticking
+            to the screen. Below 720px it stays fixed at the bottom while the
+            list scrolls, and settles after the last card at the end. -#}
+        <div class="k-paybar">
+            <label class="k-pick k-paybar__all"><input type="checkbox" id="select-all-bar" data-select-all aria-label="Seleccionar todas" {% if all_checked %}checked{% endif %}> Todas</label>
+            <div class="k-paybar__sum">
+                <span class="k-label">Seleccionado</span>
+                <div><strong id="selected-total">{{ selected_total | cop }}</strong> <span class="k-dim" id="selected-count">{{ selected_count }} de {{ sales | length }} ventas</span></div>
+            </div>
+            <button type="submit" class="k-btn k-btn--primary">Registrar pago</button>
+        </div>
+    </form>
+    {% endif %}
 
     {% if pg %}{{ pager(pg, "/payments", params) }}{% endif %}
 
@@ -172,10 +210,13 @@
   // Comfort only: the server recomputes everything from the ids it receives.
   (function () {
     const form = document.getElementById("payment-form");
+    // The table's checkboxes are what gets sent; everything else mirrors them.
     const boxes = Array.from(form.querySelectorAll('input[name="movement_ids"]'));
-    const all = document.getElementById("select-all");
+    const twins = Array.from(form.querySelectorAll("input[data-twin]"));
+    const alls = Array.from(form.querySelectorAll("input[data-select-all]"));
     const total = document.getElementById("selected-total");
     const count = document.getElementById("selected-count");
+    const boxFor = (id) => boxes.find((box) => box.value === id);
 
     function sync() {
       const chosen = boxes.filter((box) => box.checked);
@@ -183,14 +224,34 @@
       const cents = chosen.reduce((sum, box) => sum + Math.round(parseFloat(box.dataset.amount) * 100), 0);
       total.textContent = "$ " + (cents / 100).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       count.textContent = chosen.length + " de " + boxes.length + " ventas";
-      all.checked = chosen.length === boxes.length;
+      twins.forEach((twin) => { twin.checked = boxFor(twin.dataset.twin).checked; });
+      alls.forEach((all) => { all.checked = chosen.length === boxes.length; });
     }
 
-    all.addEventListener("change", () => {
+    twins.forEach((twin) => {
+      twin.disabled = false;
+      twin.addEventListener("change", () => {
+        boxFor(twin.dataset.twin).checked = twin.checked;
+        sync();
+      });
+    });
+    alls.forEach((all) => all.addEventListener("change", () => {
       boxes.forEach((box) => { box.checked = all.checked; });
       sync();
-    });
+    }));
     boxes.forEach((box) => box.addEventListener("change", sync));
+
+    // A tap anywhere on a row or card toggles its sale, except on something
+    // that already does its own thing (the checkbox and its label, and the
+    // "Corregir cobro" link), so correcting a sale never also (un)selects it.
+    form.addEventListener("click", (event) => {
+      const row = event.target.closest("[data-select-row]");
+      if (!row || event.target.closest("a, button, input, label")) return;
+      const box = row.querySelector('input[type="checkbox"]');
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event("change"));
+    });
+
     form.addEventListener("submit", (event) => {
       if (!confirm("¿Registrar el pago de " + count.textContent.split(" de ")[0] + " venta(s) por " + total.textContent + "?")) {
         event.preventDefault();
