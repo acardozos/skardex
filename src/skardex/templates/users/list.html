@@ -42,7 +42,7 @@
     {% endif %}
 
     <div class="k-card">
-        <table class="k-table">
+        <table class="k-table k-table--cards k-table--users">
             <thead>
                 <tr>
                     <th>Usuario</th>
@@ -54,10 +54,10 @@
             <tbody>
                 {% for u in users %}
                 <tr>
-                    <td data-label="Usuario" class="k-strong">{{ u.username }}</td>
-                    <td data-label="Rol" class="k-dim">{{ "Admin" if u.role == "admin" else "Operario" }}</td>
-                    <td data-label="Estado"><span class="k-tag{{ ' k-tag--ok' if u.is_active else ' k-tag--neutral' }}">{{ "Activo" if u.is_active else "Inactivo" }}</span></td>
-                    <td data-label="Acciones" class="k-cell--wide">
+                    <td class="k-strong k-c-name">{{ u.username }}</td>
+                    <td class="k-dim k-c-role">{{ "Admin" if u.role == "admin" else "Operario" }}</td>
+                    <td class="k-c-state"><span class="k-tag{{ ' k-tag--ok' if u.is_active else ' k-tag--neutral' }}">{{ "Activo" if u.is_active else "Inactivo" }}</span></td>
+                    <td class="k-c-actions">
                         <div class="k-actions">
                             {% if u.role == "admin" %}
                             <span class="k-dim">Cuenta del dueño</span>

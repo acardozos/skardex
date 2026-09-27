@@ -1353,7 +1353,7 @@ def test_the_summary_is_above_and_the_controls_below_the_table(
 
     # Spec 007 (H9-01/02): only the summary above, the controls once, below.
     assert html.count('class="k-pager"') == 1
-    table = html.index('<table class="k-table">')
+    table = html.index('<table class="k-table')
     table_end = html.index("</table>")
     assert html.index('class="k-pager__summary"') < table
     assert html.index('class="k-pager"') > table_end

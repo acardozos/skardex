@@ -149,6 +149,18 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-alert__head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
 .k-alert__icon{font-size:18px;filter:grayscale(0.2)}
 .k-alert__text{margin:4px 0 0;font-size:15px;font-weight:500}
+/* Inicio's alerts (spec 007, H4-05): when both are present they sit
+   together and compact, each button beside its text instead of below it. */
+.k-alerts{display:flex;flex-direction:column;gap:24px}
+.k-alerts--pair{gap:12px}
+.k-alerts--pair .k-alert{display:grid;grid-template-columns:1fr auto;grid-template-areas:"head btn" "chips chips";column-gap:16px;align-items:center;padding:16px 20px}
+.k-alerts--pair .k-alert__head{grid-area:head;margin-bottom:0}
+.k-alerts--pair .k-alert > .k-btn{grid-area:btn}
+.k-alerts--pair .k-chips{grid-area:chips;margin-top:12px}
+@media (max-width:479.98px){
+  .k-alerts--pair .k-alert{grid-template-columns:1fr;grid-template-areas:"head" "chips" "btn"}
+  .k-alerts--pair .k-alert > .k-btn{justify-self:start;margin-top:12px}
+}
 .k-chips{display:flex;flex-wrap:wrap;gap:10px}
 .k-chip{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:14px;font-weight:500}
 .k-chip span{font-size:13px;font-weight:400;color:var(--muted)}
@@ -183,14 +195,45 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 }
 
 @media (max-width:880px){
-  .k-table thead{display:none}
-  .k-table tr{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;padding:14px 16px;border-bottom:1px solid var(--border)}
-  .k-table td{display:block;padding:0;border:none;text-align:left}
-  .k-table td::before{content:attr(data-label);display:block;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
-  .k-table td.k-num{text-align:left}
-  .k-table td.k-cell--wide{grid-column:1 / -1}
-  .k-actions{justify-content:flex-start}
   .k-page-head h1{font-size:27px}
+  /* Temporary (spec 007): Movimientos and Pagos keep the old generic
+     "label + value" stacking until tasks 6 and 8 give them their own cards. */
+  .k-table--stacked thead{display:none}
+  .k-table--stacked tr{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .k-table--stacked td{display:block;padding:0;border:none;text-align:left}
+  .k-table--stacked td::before{content:attr(data-label);display:block;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .k-table--stacked td.k-num{text-align:left}
+  .k-table--stacked td.k-cell--wide{grid-column:1 / -1}
+  .k-table--stacked .k-actions{justify-content:flex-start}
+}
+
+/* ---------- Simple tables as compact cards (spec 007, H1/H4) ---------- */
+/* The same <table> is reflowed below 720px: no field labels, the main datum
+   on top, the rest in one muted line. Cells only one of the two views needs
+   are marked .k-only-table / .k-only-card; an empty cell is .is-empty and
+   the card leaves it out instead of printing "-". */
+.k-only-card{display:none}
+.k-meta > span + span::before{content:" · "}
+@media (max-width:719.98px){
+  .k-table--cards thead{display:none}
+  .k-table--cards tr{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .k-table--cards tr:last-child{border-bottom:none}
+  .k-table--cards td{display:block;padding:0;border:none;text-align:left}
+  .k-table--cards .k-only-table,.k-table--cards .is-empty{display:none}
+  .k-table--cards .k-only-card{display:block}
+  .k-table--cards .k-actions{justify-content:flex-start}
+  .k-table--cards .k-c-name{grid-area:name}
+  .k-table--cards .k-c-state{grid-area:state;justify-self:end}
+  .k-table--cards .k-c-role{grid-area:role}
+  .k-table--cards .k-c-qty{grid-area:qty;justify-self:end}
+  .k-table--cards .k-c-meta,.k-table--cards .k-c-date,.k-table--cards .k-c-note{color:var(--muted);font-size:14px}
+  .k-table--cards .k-c-meta{grid-area:meta}
+  .k-table--cards .k-c-date{grid-area:date}
+  .k-table--cards .k-c-note{grid-area:note}
+  .k-table--cards .k-c-actions{grid-area:actions}
+  .k-table--balances tr,.k-table--catalog tr{grid-template-areas:"name state" "meta meta" "actions actions"}
+  .k-table--users tr{grid-template-columns:1fr auto auto;grid-template-areas:"name role state" "actions actions actions"}
+  .k-table--unpriced tr{grid-template-areas:"name qty" "date date" "note note" "actions actions"}
 }
 
 /* ---------- Focus and touch targets (spec 007, H5) ---------- */

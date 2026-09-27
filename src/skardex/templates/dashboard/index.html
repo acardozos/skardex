@@ -39,38 +39,42 @@
         </div>
     </div>
 
-    {% if low_stock_count > 0 %}
-    <div class="k-alert">
-        <div class="k-alert__head">
-            <span class="k-alert__icon">⚠️</span>
-            <div>
-                <p class="k-eyebrow">Atención</p>
-                <p class="k-alert__text">{{ low_stock_count }} artículo{{ "s" if low_stock_count != 1 else "" }} {{ "están" if low_stock_count != 1 else "está" }} por debajo de su stock mínimo.</p>
+    {#- Both alerts together sit compact, side by side with their buttons. -#}
+    {% set both_alerts = low_stock_count > 0 and unpriced_sales_count > 0 %}
+    <div class="k-alerts{{ ' k-alerts--pair' if both_alerts else '' }}">
+        {% if low_stock_count > 0 %}
+        <div class="k-alert" id="low-stock-alert">
+            <div class="k-alert__head">
+                <span class="k-alert__icon">⚠️</span>
+                <div>
+                    <p class="k-eyebrow">Atención</p>
+                    <p class="k-alert__text">{{ low_stock_count }} artículo{{ "s" if low_stock_count != 1 else "" }} {{ "están" if low_stock_count != 1 else "está" }} por debajo de su stock mínimo.</p>
+                </div>
             </div>
+            <div class="k-chips">
+                {% for item in items if item.is_low %}
+                <div class="k-chip">{{ item.material.name }} <span>{{ item.balance }} de {{ item.material.min_stock }} {{ unit_labels.get(item.material.unit, item.material.unit) }}</span></div>
+                {% endfor %}
+            </div>
+            <a class="k-btn k-btn--ghost k-btn--sm" id="low-stock-link" href="{{ page_url('/', {}, bajo_minimo='1') }}">Ver en la tabla de saldos</a>
         </div>
-        <div class="k-chips">
-            {% for item in items if item.is_low %}
-            <div class="k-chip">{{ item.material.name }} <span>{{ item.balance }} de {{ item.material.min_stock }} {{ unit_labels.get(item.material.unit, item.material.unit) }}</span></div>
-            {% endfor %}
-        </div>
-        <a class="k-btn k-btn--ghost k-btn--sm" id="low-stock-link" href="{{ page_url('/', {}, bajo_minimo='1') }}">Ver en la tabla de saldos</a>
-    </div>
-    {% else %}
-    <div class="k-ok"><span class="k-dot"></span> Todos los artículos están sobre su stock mínimo.</div>
-    {% endif %}
+        {% else %}
+        <div class="k-ok"><span class="k-dot"></span> Todos los artículos están sobre su stock mínimo.</div>
+        {% endif %}
 
-    {% if unpriced_sales_count > 0 %}
-    <div class="k-alert" id="unpriced-alert">
-        <div class="k-alert__head">
-            <span class="k-alert__icon">💲</span>
-            <div>
-                <p class="k-eyebrow">Atención</p>
-                <p class="k-alert__text">{{ unpriced_sales_count }} venta{{ "s" if unpriced_sales_count != 1 else "" }} sin precio: no {{ "entran" if unpriced_sales_count != 1 else "entra" }} en el pendiente de pago hasta que se {{ "les fije" if unpriced_sales_count != 1 else "le fije" }} el precio.</p>
+        {% if unpriced_sales_count > 0 %}
+        <div class="k-alert" id="unpriced-alert">
+            <div class="k-alert__head">
+                <span class="k-alert__icon">💲</span>
+                <div>
+                    <p class="k-eyebrow">Atención</p>
+                    <p class="k-alert__text">{{ unpriced_sales_count }} venta{{ "s" if unpriced_sales_count != 1 else "" }} sin precio: no {{ "entran" if unpriced_sales_count != 1 else "entra" }} en el pendiente de pago hasta que se {{ "les fije" if unpriced_sales_count != 1 else "le fije" }} el precio.</p>
+                </div>
             </div>
+            <a class="k-btn k-btn--ghost k-btn--sm" href="/movements?cobro=sin_precio">Ver las ventas sin precio</a>
         </div>
-        <a class="k-btn k-btn--ghost k-btn--sm" href="/movements?cobro=sin_precio">Ver las ventas sin precio</a>
+        {% endif %}
     </div>
-    {% endif %}
 
     <div class="k-toolbar" id="saldos">
         <form method="get" action="/">
@@ -89,7 +93,7 @@
             <h2 class="k-card__title">Saldos por artículo</h2>
             <span class="k-card__meta">{{ active_materials_count }} artículo{{ "s" if active_materials_count != 1 else "" }} activo{{ "s" if active_materials_count != 1 else "" }}</span>
         </div>
-        <table class="k-table">
+        <table class="k-table k-table--cards k-table--balances">
             <thead>
                 <tr>
                     <th>Artículo</th>
@@ -102,11 +106,16 @@
             <tbody>
                 {% for item in pg.items %}
                 <tr>
-                    <td data-label="Artículo" class="k-strong">{{ item.material.name }}</td>
-                    <td data-label="Unidad" class="k-dim">{{ unit_labels.get(item.material.unit, item.material.unit) }}</td>
-                    <td data-label="Saldo actual" class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance }}</td>
-                    <td data-label="Stock mínimo" class="k-num k-dim">{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
-                    <td data-label="Estado" class="k-num"><span class="k-tag {{ 'k-tag--warn' if item.is_low else 'k-tag--ok' }}">{{ "Bajo mínimo" if item.is_low else "En orden" }}</span></td>
+                    {% set unit = unit_labels.get(item.material.unit, item.material.unit) %}
+                    <td class="k-strong k-c-name">{{ item.material.name }}</td>
+                    <td class="k-dim k-only-table">{{ unit }}</td>
+                    <td class="k-num k-only-table{{ ' k-low' if item.is_low else '' }}">{{ item.balance }}</td>
+                    <td class="k-num k-dim k-only-table">{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
+                    <td class="k-num k-c-state"><span class="k-tag {{ 'k-tag--warn' if item.is_low else 'k-tag--ok' }}">{{ "Bajo mínimo" if item.is_low else "En orden" }}</span></td>
+                    <td class="k-only-card k-c-meta k-meta">
+                        <span class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance }} {{ unit }}</span>
+                        {%- if item.material.min_stock is not none %}<span>mín. {{ item.material.min_stock }}</span>{% endif -%}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

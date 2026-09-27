@@ -288,15 +288,15 @@ def _stock(db: Session, count: int, *, low: frozenset[int] = frozenset()) -> Non
 
 def _names(html: str) -> list[str]:
     """The materials of the balances table (not the alert chips), in order."""
-    return re.findall(r'data-label="Artículo" class="k-strong">(Mat\d{3})<', html)
+    return re.findall(r'class="k-strong k-c-name">(Mat\d{3})<', html)
 
 
 def _balances(html: str) -> dict[str, str]:
     return {
         name: balance
         for name, balance in re.findall(
-            r'data-label="Artículo" class="k-strong">(Mat\d{3})</td>.*?'
-            r'data-label="Saldo actual" class="k-num[^"]*">([^<]*)<',
+            r'class="k-strong k-c-name">(Mat\d{3})</td>.*?'
+            r'class="k-num k-only-table[^"]*">([^<]*)<',
             html,
             re.S,
         )
@@ -353,7 +353,7 @@ def test_the_balances_table_has_the_summary_above_and_the_controls_below(
     # Spec 007 (H9-01/02): only the summary above, the controls once, below.
     assert html.count("Mostrando 11–20 de 23") == 1
     assert html.count('class="k-pager"') == 1
-    table = html.index('<table class="k-table">')
+    table = html.index('<table class="k-table')
     summary = html.index('class="k-pager__summary"')
     assert summary < table < html.index('class="k-pager"')
 
@@ -656,3 +656,78 @@ def test_the_dashboard_does_not_echo_unknown_parameters(
 
     assert "zzmarker" not in html
     assert "bogus" not in html
+
+
+# --- Spec 007, task 5: balances as compact cards, paired alerts ------------
+
+
+def _card_line(html: str, name: str) -> str:
+    """The card-only line (`.k-only-card`) of the balance row for `name`."""
+    row = re.search(rf"<tr>(?:(?!</tr>).)*?>{re.escape(name)}</td>.*?</tr>", html, re.S)
+    assert row is not None, f"row {name!r} not found"
+    line = re.search(r'<td class="k-only-card[^"]*">(.*?)</td>', row.group(0), re.S)
+    assert line is not None, f"no card line for {name!r}"
+    return re.sub(r"\s+", " ", line.group(1)).strip()
+
+
+def test_a_balance_card_shows_the_balance_and_the_minimum_without_labels(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H4-01, H5-04 — no minimum set means no "mín." part, not "-"."""
+    cement = Material(name="Cemento", unit="kg", min_stock=Decimal("10"))
+    sand = Material(name="Arena", unit="kg")
+    db_session.add_all([cement, sand])
+    db_session.commit()
+    db_session.add(
+        Movement(
+            material_id=cement.id,
+            user_id=admin_user.id,
+            type=MovementType.ENTRADA,
+            quantity=Decimal("4"),
+            movement_date=date(2026, 9, 1),
+            reason="compra",
+        )
+    )
+    db_session.commit()
+
+    html = admin_client.get("/").text
+
+    assert _card_line(html, "Cemento") == (
+        '<span class="k-num k-low">4.000 kg</span><span>mín. 10.000</span>'
+    )
+    assert _card_line(html, "Arena") == '<span class="k-num">0.000 kg</span>'
+    assert 'class="k-table k-table--cards k-table--balances"' in html
+
+
+def test_both_alerts_sit_together_as_a_compact_pair(
+    admin_client: TestClient, db_session: Session, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H4-04, H4-05 — only when both are present."""
+    db_session.add(Material(name="Cemento", unit="kg", min_stock=Decimal("5")))
+    db_session.commit()
+
+    only_low = admin_client.get("/").text
+    make_sale("Arena", user=admin_user, price=None)
+    both = admin_client.get("/").text
+
+    assert '<div class="k-alerts">' in only_low
+    assert "k-alerts--pair" not in only_low
+    assert '<div class="k-alerts k-alerts--pair">' in both
+    pair = both[both.index("k-alerts--pair") : both.index('id="saldos"')]
+    assert 'id="low-stock-alert"' in pair and 'id="unpriced-alert"' in pair
+    css = admin_client.get("/static/css/kardex.css").text
+    assert ".k-alert{background:var(--surface);border:1px solid var(--warn)" in css
+
+
+def test_the_low_stock_filter_keeps_both_shortcuts(
+    admin_client: TestClient, db_session: Session, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H4-06 — the alert's button and the toolbar filter, even as a pair."""
+    db_session.add(Material(name="Cemento", unit="kg", min_stock=Decimal("5")))
+    db_session.commit()
+    make_sale("Arena", user=admin_user, price=None)
+
+    html = admin_client.get("/").text
+
+    assert 'id="low-stock-link" href="/?bajo_minimo=1"' in html
+    assert "Solo bajo el mínimo</a>" in html

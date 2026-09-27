@@ -635,7 +635,8 @@ def test_catalog_shows_the_price_and_a_tag_for_materials_without_one(
     for client in (admin_client, operario_client):
         html = client.get("/materials").text
         assert "$ 1.234.567,50" in html
-        assert html.count(UNPRICED_TAG) == 2
+        # Spec 007: each one shows it in its table cell and in its card line.
+        assert html.count(UNPRICED_TAG) == 4
 
 
 def test_filter_shows_only_materials_without_a_reference_price(
@@ -774,7 +775,7 @@ def _catalog(db: Session, count: int, **fields: object) -> None:
 
 def _codes(html: str) -> list[str]:
     """The codes of the rows shown, in display order."""
-    return re.findall(r'data-label="Código" class="k-dim">(C\d{3})', html)
+    return re.findall(r'class="k-dim k-only-table">(C\d{3})', html)
 
 
 def _links(html: str) -> list[str]:
@@ -828,7 +829,7 @@ def test_the_catalog_has_the_summary_above_and_the_controls_below(
     # Spec 007 (H9-01/02): only the summary above, the controls once, below.
     assert html.count("Mostrando 11–20 de 23") == 1
     assert html.count('class="k-pager"') == 1
-    table = html.index('<table class="k-table">')
+    table = html.index('<table class="k-table')
     summary = html.index('class="k-pager__summary"')
     assert summary < table < html.index('class="k-pager"')
 
@@ -1135,3 +1136,46 @@ def test_the_notice_uses_the_singular_for_one_sale(
     html = admin_client.get("/materials").text
     assert "1 venta sin precio" in html
     assert "no la corrige" in html
+
+
+# --- Spec 007, task 5: the catalog as compact cards -------------------------
+
+
+def _catalog_card_line(html: str, name: str) -> str:
+    row = re.search(rf"<tr>(?:(?!</tr>).)*?>{re.escape(name)}</td>.*?</tr>", html, re.S)
+    assert row is not None, f"row {name!r} not found"
+    line = re.search(r'<td class="k-only-card[^"]*">(.*?)</td>', row.group(0), re.S)
+    assert line is not None, f"no card line for {name!r}"
+    return re.sub(r"\s+", " ", line.group(1)).strip()
+
+
+def test_a_catalog_card_joins_code_unit_minimum_and_price_skipping_blanks(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H4-02, H5-04 — a missing code or minimum is left out, not "-";
+    a missing price keeps its "Sin precio" tag, since that is a state."""
+    db_session.add_all(
+        [
+            Material(
+                code="CEM-1",
+                name="Cemento",
+                unit="kg",
+                min_stock=Decimal("5"),
+                sale_price=Decimal("1200"),
+            ),
+            Material(name="Arena", unit="kg"),
+        ]
+    )
+    db_session.commit()
+
+    html = admin_client.get("/materials").text
+
+    assert _catalog_card_line(html, "Cemento") == (
+        "<span>CEM-1</span><span>kg</span><span>mín. 5.000</span>"
+        "<span>$ 1.200,00</span>"
+    )
+    assert _catalog_card_line(html, "Arena") == (
+        '<span>kg</span><span><span class="k-tag k-tag--warn">Sin precio</span></span>'
+    )
+    assert 'class="k-table k-table--cards k-table--catalog"' in html
+    assert "data-label" not in html

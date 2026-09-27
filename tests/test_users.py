@@ -354,3 +354,16 @@ def test_the_users_list_is_not_paged(
     assert len(re.findall(r"operario\d{2}", html)) >= 15
     assert "k-pager" not in html
     assert "Filas por página" not in html
+
+
+def test_the_users_table_reflows_into_compact_cards(
+    admin_client: TestClient, operario_user: User
+) -> None:
+    """EARS-H4-03 — name, role and state on one line, the actions below."""
+    html = admin_client.get("/users").text
+
+    assert 'class="k-table k-table--cards k-table--users"' in html
+    assert '<td class="k-strong k-c-name">operario1</td>' in html
+    assert '<td class="k-dim k-c-role">Operario</td>' in html
+    assert '<td class="k-c-actions">' in html
+    assert "data-label" not in html

@@ -894,3 +894,21 @@ def test_the_size_is_remembered_from_the_payments_screen_and_shared(
 
     assert len(_rows(admin_client.get("/payments?estado=todos").text)) == 25
     assert "set-cookie" not in admin_client.get("/payments?estado=todos").headers
+
+
+def test_an_unpriced_sale_card_leaves_out_an_empty_note(
+    admin_client: TestClient, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H5-04 — the "Ventas sin precio" table is a simple table: its card
+    omits the note line instead of printing "Observación: -"."""
+    make_sale("Arena", user=admin_user, price=None, note="para Juan")
+    make_sale("Grava", user=admin_user, price=None)
+
+    html = admin_client.get("/payments").text
+    table = _table(html, "unpriced-table")
+
+    assert (
+        'class="k-table k-table--cards k-table--unpriced" id="unpriced-table"' in html
+    )
+    assert '<td class="k-dim k-c-note">para Juan</td>' in table
+    assert '<td class="k-dim k-c-note is-empty">-</td>' in table
