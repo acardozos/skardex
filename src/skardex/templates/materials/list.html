@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_pagination.html" import pager %}
+{% from "_pagination.html" import pager, pager_summary %}
 
 {% block title %}Artículos — Simple Kardex{% endblock %}
 
@@ -48,7 +48,7 @@
         {% endif %}
     </div>
 
-    {{ pager(pg, "/materials", params) }}
+    {{ pager_summary(pg) }}
 
     <div class="k-card">
         <table class="k-table">

@@ -779,14 +779,14 @@ def test_the_unpriced_table_is_never_paged(
     ("client_name", "user_name"),
     [("admin_client", "admin_user"), ("operario_client", "operario_user")],
 )
-def test_the_paid_and_all_views_have_the_controls_above_and_below(
+def test_the_paid_and_all_views_have_the_summary_above_and_the_controls_below(
     request: pytest.FixtureRequest,
     material: Material,
     make_sale: MakeSale,
     client_name: str,
     user_name: str,
 ) -> None:
-    """EARS-H1-02"""
+    """EARS-H1-02 (spec 005), as changed by spec 007 EARS-H9-01/02."""
     client: TestClient = request.getfixturevalue(client_name)
     user: User = request.getfixturevalue(user_name)
     _sales(make_sale, user, material, 23, paid=True)
@@ -794,13 +794,13 @@ def test_the_paid_and_all_views_have_the_controls_above_and_below(
     for estado in ("pagados", "todos"):
         html = client.get(f"/payments?estado={estado}&page=2").text
 
-        assert html.count('class="k-pager"') == 2
-        assert html.count("Mostrando 11–20 de 23") == 2
+        # Spec 007 (H9-01/02): only the summary above, the controls once, below.
+        assert html.count("Mostrando 11–20 de 23") == 1
+        assert html.count('class="k-pager"') == 1
         table = html.index('id="sales-table"')
         table_end = html.index("</table>", table)
-        first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
-        assert first < table
-        assert second > table_end
+        assert html.index('class="k-pager__summary"') < table
+        assert html.index('class="k-pager"') > table_end
 
 
 def test_the_paid_view_disables_previous_and_next_at_the_ends(
@@ -809,15 +809,15 @@ def test_the_paid_view_disables_previous_and_next_at_the_ends(
     material: Material,
     make_sale: MakeSale,
 ) -> None:
-    """EARS-H1-03"""
+    """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _sales(make_sale, admin_user, material, 23, paid=True)
 
     first = admin_client.get("/payments?estado=pagados").text
     last = admin_client.get("/payments?estado=pagados&page=3").text
 
-    assert first.count('aria-disabled="true">Anterior') == 2
+    assert first.count('aria-disabled="true">Anterior') == 1
     assert first.count('aria-disabled="true">Siguiente') == 0
-    assert last.count('aria-disabled="true">Siguiente') == 2
+    assert last.count('aria-disabled="true">Siguiente') == 1
 
 
 def test_an_empty_paid_view_shows_the_message_and_no_controls(

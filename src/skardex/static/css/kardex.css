@@ -168,6 +168,8 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-table td{padding:14px 20px;border-bottom:1px solid var(--border);font-size:15px;vertical-align:middle}
 .k-table tr:last-child td{border-bottom:none}
 .k-table .k-num{text-align:right;font-variant-numeric:tabular-nums}
+/* Quantities, amounts, tags and buttons never split across two lines. */
+.k-num,.k-tag,.k-btn{white-space:nowrap}
 .k-table .k-strong{font-weight:500}
 .k-table .k-dim{color:var(--muted);font-size:14px}
 .k-table .k-low{color:var(--warn);font-weight:700}
@@ -191,6 +193,16 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
   .k-page-head h1{font-size:27px}
 }
 
+/* ---------- Focus and touch targets (spec 007, H5) ---------- */
+/* A visible outline for keyboard focus on everything that can take it. */
+a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Fingers need 44x44px; with a mouse the smaller controls stay as they are. */
+@media (pointer:coarse){
+  .k-seg a{display:inline-flex;align-items:center;min-height:44px}
+  .k-btn--sm{min-height:44px;min-width:44px}
+  .k-btn--icon{width:44px;height:44px}
+}
+
 /* ---------- Barra de filtros ---------- */
 .k-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .k-toolbar form{display:contents}
@@ -202,8 +214,15 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 
 /* ---------- Paginación ---------- */
 .k-pager{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin:12px 0}
+/* Above a list: only how many rows there are. The controls live below it. */
+.k-pager__summary{margin:0}
 .k-pager__summary,.k-pager__pos{font-size:13px;color:var(--muted)}
 .k-pager__nav,.k-pager__size{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* Right-aligned even when it is alone (a single page has no nav). */
+.k-pager__size{margin-left:auto}
+/* Phones use the default page size; see _pagination.html. Must come after
+   the display:flex above, which would otherwise win. */
+@media (max-width:719.98px){.k-pager__size{display:none}}
 .k-pager .is-disabled{opacity:0.45;pointer-events:none}
 
 /* ---------- Formularios ---------- */
@@ -214,7 +233,7 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-label{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
 .k-input,.k-select,.k-textarea{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font:inherit;font-size:15px}
 .k-textarea{resize:vertical;min-height:72px}
-.k-input:focus,.k-select:focus,.k-textarea:focus{outline:none;border-color:var(--accent)}
+.k-input:focus,.k-select:focus,.k-textarea:focus{border-color:var(--accent)}
 .k-help{font-size:13px;color:var(--muted)}
 .k-error{font-size:13px;color:var(--danger)}
 .k-field--error .k-input,.k-field--error .k-select{border-color:var(--danger)}

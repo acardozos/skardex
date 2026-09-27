@@ -341,34 +341,35 @@ def test_a_chosen_size_is_used_in_the_balances_table(
 
 
 @pytest.mark.parametrize("client_name", ["admin_client", "operario_client"])
-def test_the_balances_table_has_the_controls_above_and_below(
+def test_the_balances_table_has_the_summary_above_and_the_controls_below(
     request: pytest.FixtureRequest, db_session: Session, client_name: str
 ) -> None:
-    """EARS-H1-02"""
+    """EARS-H1-02 (spec 005), as changed by spec 007 EARS-H9-01/02."""
     client: TestClient = request.getfixturevalue(client_name)
     _stock(db_session, 23)
 
     html = client.get("/?page=2").text
 
-    assert html.count('class="k-pager"') == 2
-    assert html.count("Mostrando 11–20 de 23") == 2
+    # Spec 007 (H9-01/02): only the summary above, the controls once, below.
+    assert html.count("Mostrando 11–20 de 23") == 1
+    assert html.count('class="k-pager"') == 1
     table = html.index('<table class="k-table">')
-    first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
-    assert first < table < second
+    summary = html.index('class="k-pager__summary"')
+    assert summary < table < html.index('class="k-pager"')
 
 
 def test_the_balances_table_disables_previous_and_next_at_the_ends(
     admin_client: TestClient, db_session: Session
 ) -> None:
-    """EARS-H1-03"""
+    """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _stock(db_session, 23)
 
     first = admin_client.get("/").text
     last = admin_client.get("/?page=3").text
 
-    assert first.count('aria-disabled="true">Anterior') == 2
+    assert first.count('aria-disabled="true">Anterior') == 1
     assert first.count('aria-disabled="true">Siguiente') == 0
-    assert last.count('aria-disabled="true">Siguiente') == 2
+    assert last.count('aria-disabled="true">Siguiente') == 1
 
 
 def test_no_controls_when_there_are_no_materials_or_no_match(

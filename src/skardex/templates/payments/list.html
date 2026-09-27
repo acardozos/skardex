@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_pagination.html" import pager %}
+{% from "_pagination.html" import pager, pager_summary %}
 
 {% block title %}Pendiente de pago — Simple Kardex{% endblock %}
 
@@ -50,7 +50,7 @@
         </nav>
     </div>
 
-    {% if pg %}{{ pager(pg, "/payments", params) }}{% endif %}
+    {% if pg %}{{ pager_summary(pg) }}{% endif %}
 
     {% set can_pay = user.role == "admin" and estado == "pendientes" and sales %}
     {% if can_pay %}<form method="post" action="/payments/register" id="payment-form">{% endif %}

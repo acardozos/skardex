@@ -1231,7 +1231,7 @@ def test_the_page_size_selector_offers_the_four_options_and_marks_the_default(
     for option in (10, 25, 50, 100):
         assert f"per_page={option}" in " ".join(_links(html))
     active = re.findall(r'<a class="is-active" href="[^"]*per_page=(\d+)', html)
-    assert active == ["10", "10"]  # the selector appears above and below
+    assert active == ["10"]  # spec 007: the selector only appears below
 
 
 @pytest.mark.parametrize("size", [25, 50, 100])
@@ -1340,24 +1340,24 @@ def test_rows_sharing_a_date_keep_a_stable_order_across_pages(
     assert sorted(seen) == [f"fila{i:03d}" for i in range(1, 16)]
 
 
-def test_the_controls_appear_above_and_below_the_table(
+def test_the_summary_is_above_and_the_controls_below_the_table(
     admin_client: TestClient,
     admin_user: User,
     material: Material,
     db_session: Session,
 ) -> None:
-    """EARS-H1-02"""
+    """EARS-H1-02 (spec 005), as changed by spec 007 EARS-H9-01/02."""
     _add_history(db_session, admin_user, material, 23)
 
     html = admin_client.get("/movements?page=2").text
 
-    assert html.count('class="k-pager"') == 2
+    # Spec 007 (H9-01/02): only the summary above, the controls once, below.
+    assert html.count('class="k-pager"') == 1
     table = html.index('<table class="k-table">')
     table_end = html.index("</table>")
-    first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
-    assert first < table
-    assert second > table_end
-    assert html.count("Mostrando 11–20 de 23") == 2
+    assert html.index('class="k-pager__summary"') < table
+    assert html.index('class="k-pager"') > table_end
+    assert html.count("Mostrando 11–20 de 23") == 1
 
 
 def test_the_controls_are_there_for_the_operario_too(
@@ -1371,7 +1371,7 @@ def test_the_controls_are_there_for_the_operario_too(
 
     html = operario_client.get("/movements").text
 
-    assert html.count('class="k-pager"') == 2
+    assert html.count('class="k-pager"') == 1
     assert "Siguiente" in html
 
 
@@ -1381,7 +1381,7 @@ def test_previous_and_next_are_disabled_at_the_ends(
     material: Material,
     db_session: Session,
 ) -> None:
-    """EARS-H1-03"""
+    """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _add_history(db_session, admin_user, material, 23)
 
     first = admin_client.get("/movements").text
@@ -1389,27 +1389,29 @@ def test_previous_and_next_are_disabled_at_the_ends(
     last = admin_client.get("/movements?page=3").text
 
     disabled = 'is-disabled" aria-disabled="true">'
-    assert first.count(f"{disabled}Anterior") == 2
+    assert first.count(f"{disabled}Anterior") == 1
     assert first.count(f"{disabled}Siguiente") == 0
     assert middle.count(disabled) == 0
-    assert last.count(f"{disabled}Siguiente") == 2
+    assert last.count(f"{disabled}Siguiente") == 1
     assert last.count(f"{disabled}Anterior") == 0
     assert 'rel="next"' in middle and 'rel="prev"' in middle
 
 
-def test_a_single_page_disables_both_buttons_but_keeps_the_selector(
+def test_a_single_page_has_no_previous_or_next_but_keeps_the_selector(
     admin_client: TestClient,
     admin_user: User,
     material: Material,
     db_session: Session,
 ) -> None:
-    """EARS-H1-03"""
+    """EARS-H1-03 (spec 005), as changed by spec 007 EARS-H9-03."""
     _add_history(db_session, admin_user, material, 10)
 
     html = admin_client.get("/movements").text
 
-    assert html.count('aria-disabled="true">Anterior') == 2
-    assert html.count('aria-disabled="true">Siguiente') == 2
+    # Spec 007 (H9-03): with one page there is nowhere to go.
+    assert "Anterior" not in html
+    assert "Siguiente" not in html
+    assert "Página 1 de 1" not in html
     assert "Filas por página" in html
     assert "Mostrando 1–10 de 10" in html
 

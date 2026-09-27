@@ -1,10 +1,21 @@
-{#- Page controls for a paginated list. `pg` is a pagination.Page; `params` holds
-    only the already-sanitised filters of the list, so links never carry stray
-    query parameters. Page-size links drop `page` (they go back to page 1). -#}
+{#- Pagination for a list (spec 005, split in spec 007). `pg` is a
+    pagination.Page; `params` holds only the already-sanitised filters of the
+    list, so links never carry stray query parameters.
+
+    Above the list goes `pager_summary` (just how many rows); below it goes
+    `pager` (the controls). Page-size links drop `page` (back to page 1). -#}
+
+{% macro pager_summary(pg) %}
+{% if pg.total > 0 %}
+<p class="k-pager__summary">Mostrando {{ pg.first }}–{{ pg.last }} de {{ pg.total }}</p>
+{% endif %}
+{% endmacro %}
+
 {% macro pager(pg, base_path, params) %}
 {% if pg.total > 0 %}
 <div class="k-pager">
-    <span class="k-pager__summary">Mostrando {{ pg.first }}–{{ pg.last }} de {{ pg.total }}</span>
+    {#- With a single page there is nowhere to go: no Previous/Next at all. -#}
+    {% if pg.pages > 1 %}
     <nav class="k-pager__nav" aria-label="Páginas">
         {% if pg.has_prev %}
         <a class="k-btn k-btn--ghost k-btn--sm" rel="prev" href="{{ page_url(base_path, params, page=pg.page - 1, per_page=pg.per_page) }}">Anterior</a>
@@ -18,6 +29,10 @@
         <span class="k-btn k-btn--ghost k-btn--sm is-disabled" aria-disabled="true">Siguiente</span>
         {% endif %}
     </nav>
+    {% endif %}
+    {#- Hidden below 720px by CSS only: the choice lives in a browser cookie,
+        so a phone that never shows it just keeps the default size, and a
+        desktop keeps its own choice (spec 007, H9). -#}
     <div class="k-pager__size">
         <span class="k-label">Filas por página</span>
         <nav class="k-seg" aria-label="Filas por página">

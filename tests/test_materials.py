@@ -816,34 +816,35 @@ def test_a_chosen_page_size_is_used_in_the_catalog(
 
 
 @pytest.mark.parametrize("client_name", ["admin_client", "operario_client"])
-def test_the_catalog_has_the_controls_above_and_below_for_both_roles(
+def test_the_catalog_has_the_summary_above_and_the_controls_below(
     request: pytest.FixtureRequest, db_session: Session, client_name: str
 ) -> None:
-    """EARS-H1-02"""
+    """EARS-H1-02 (spec 005), as changed by spec 007 EARS-H9-01/02."""
     client: TestClient = request.getfixturevalue(client_name)
     _catalog(db_session, 23)
 
     html = client.get("/materials?page=2").text
 
-    assert html.count('class="k-pager"') == 2
-    assert html.count("Mostrando 11–20 de 23") == 2
+    # Spec 007 (H9-01/02): only the summary above, the controls once, below.
+    assert html.count("Mostrando 11–20 de 23") == 1
+    assert html.count('class="k-pager"') == 1
     table = html.index('<table class="k-table">')
-    first, second = (m.start() for m in re.finditer(r'class="k-pager"', html))
-    assert first < table < second
+    summary = html.index('class="k-pager__summary"')
+    assert summary < table < html.index('class="k-pager"')
 
 
 def test_the_catalog_disables_previous_and_next_at_the_ends(
     admin_client: TestClient, db_session: Session
 ) -> None:
-    """EARS-H1-03"""
+    """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _catalog(db_session, 23)
 
     first = admin_client.get("/materials").text
     last = admin_client.get("/materials?page=3").text
 
-    assert first.count('aria-disabled="true">Anterior') == 2
+    assert first.count('aria-disabled="true">Anterior') == 1
     assert first.count('aria-disabled="true">Siguiente') == 0
-    assert last.count('aria-disabled="true">Siguiente') == 2
+    assert last.count('aria-disabled="true">Siguiente') == 1
     assert last.count('aria-disabled="true">Anterior') == 0
 
 
@@ -984,7 +985,7 @@ def test_the_operario_keeps_the_admin_only_filters_out_of_the_catalog_controls(
 
     assert "Inactivos" not in html
     assert "Sin precio</a>" not in html
-    assert html.count('class="k-pager"') == 2
+    assert html.count('class="k-pager"') == 1
 
 
 def test_the_page_size_chosen_in_the_history_is_used_in_the_catalog(

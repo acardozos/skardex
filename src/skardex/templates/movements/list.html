@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_pagination.html" import pager %}
+{% from "_pagination.html" import pager, pager_summary %}
 
 {% block title %}Movimientos — Simple Kardex{% endblock %}
 
@@ -36,7 +36,7 @@
         </nav>
     </div>
 
-    {{ pager(pg, "/movements", params) }}
+    {{ pager_summary(pg) }}
 
     <div class="k-card">
         <table class="k-table">

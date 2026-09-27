@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from fastapi import Response
 from sqlalchemy.orm import Session
@@ -279,3 +281,17 @@ def test_safe_return_url_keeps_only_what_the_list_understands(
 def test_safe_return_url_falls_back_to_the_history(value: str) -> None:
     """EARS-H4-03"""
     assert safe_return_url(value) == "/movements"
+
+
+def test_the_page_size_selector_really_hides_on_narrow_screens() -> None:
+    """Spec 007 EARS-H9-04. The hiding rule must come after the rule that
+    shows the selector: same specificity, so the later one wins. It once came
+    first and the selector never hid (found by the user on a phone)."""
+    css = (
+        Path(__file__).parents[1] / "src" / "skardex" / "static" / "css" / "kardex.css"
+    ).read_text()
+
+    hides = css.index("@media (max-width:719.98px){.k-pager__size{display:none}}")
+    shows = css.index(".k-pager__nav,.k-pager__size{display:flex")
+
+    assert shows < hides
