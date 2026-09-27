@@ -15,7 +15,9 @@
     </div>
 
     {% set is_admin = request.session.get("role") == "admin" %}
-    <div class="k-toolbar">
+    {#- Desktop (1024px and up): the filters as they always were, each one
+        applied as soon as it changes. -#}
+    <div class="k-toolbar k-toolbar--wide">
         <form method="get" action="/movements">
             <input type="hidden" name="type" value="{{ selected_type }}">
             <input type="hidden" name="cobro" value="{{ selected_cobro }}">
@@ -35,6 +37,57 @@
             <a class="{% if selected_cobro %}is-active{% endif %}" href="{{ page_url('/movements', params, cobro=None if selected_cobro else 'sin_precio') }}">Ventas sin precio</a>
         </nav>
     </div>
+
+    {#- Tablets and phones (spec 007, H10): the same three filters folded into
+        a panel, sent together with "Aplicar" instead of reloading on every
+        tap. What is active always shows below as removable tags, even with
+        the panel closed, so a short list never looks unexplained. -#}
+    {% set type_labels = {"entrada": "Entradas", "salida": "Salidas"} %}
+    {% set active_count = (1 if selected_material_id else 0) + (1 if selected_type else 0) + (1 if selected_cobro else 0) %}
+    <details class="k-filters">
+        <summary class="k-btn k-btn--ghost k-filters__toggle">Filtros{% if active_count %} · {{ active_count }}{% endif %}</summary>
+        <form class="k-filters__panel" method="get" action="/movements">
+            <div class="k-field">
+                <label class="k-label" for="filter-material">Artículo</label>
+                <select class="k-select" id="filter-material" name="material_id">
+                    <option value="">Todos los artículos</option>
+                    {% for material in materials %}
+                    <option value="{{ material.id }}" {% if selected_material_id == material.id %}selected{% endif %}>{{ material.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="k-field">
+                <span class="k-label" id="filter-type-label">Tipo</span>
+                <div class="k-seg k-filters__types" role="radiogroup" aria-labelledby="filter-type-label">
+                    {% for value, label in [("", "Todos"), ("entrada", "Entradas"), ("salida", "Salidas")] %}
+                    <label class="k-radio">
+                        <input type="radio" name="type" value="{{ value }}" {% if selected_type == value %}checked{% endif %}>
+                        <span class="k-btn k-btn--ghost k-btn--block">{{ label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <label class="k-check">
+                <input type="checkbox" name="cobro" value="sin_precio" {% if selected_cobro %}checked{% endif %}>
+                Solo ventas sin precio
+            </label>
+            <button type="submit" class="k-btn k-btn--primary">Aplicar</button>
+        </form>
+    </details>
+    {% if active_count %}
+    <div class="k-filter-chips">
+        {% if selected_material_id %}
+        {% set material_name = (materials | selectattr("id", "equalto", selected_material_id) | map(attribute="name") | first) %}
+        <a class="k-filter-chip" href="{{ page_url('/movements', params, material_id=None) }}" aria-label="Quitar filtro: {{ material_name }}">{{ material_name }} ✕</a>
+        {% endif %}
+        {% if selected_type %}
+        <a class="k-filter-chip" href="{{ page_url('/movements', params, type=None) }}" aria-label="Quitar filtro: {{ type_labels[selected_type] }}">{{ type_labels[selected_type] }} ✕</a>
+        {% endif %}
+        {% if selected_cobro %}
+        <a class="k-filter-chip" href="{{ page_url('/movements', params, cobro=None) }}" aria-label="Quitar filtro: Ventas sin precio">Ventas sin precio ✕</a>
+        {% endif %}
+    </div>
+    {% endif %}
 
     {{ pager_summary(pg) }}
 

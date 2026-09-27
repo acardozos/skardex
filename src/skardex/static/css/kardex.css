@@ -394,3 +394,22 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
   .k-mcards{grid-template-columns:1fr 1fr}
   .k-mcard:nth-child(odd){border-right:1px solid var(--border)}
 }
+
+/* ---------- Movimientos: folded filters on tablets and phones (spec 007, H10) ---------- */
+.k-filters,.k-filter-chips{display:none}
+.k-filters__toggle{list-style:none}
+.k-filters__toggle::-webkit-details-marker{display:none}
+.k-filters__panel{margin-top:10px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.k-filters__types{display:grid;grid-template-columns:repeat(3,1fr);width:100%}
+.k-check{display:inline-flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
+.k-check input{width:18px;height:18px;accent-color:var(--accent)}
+.k-filter-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:20px;background:var(--surface2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap}
+.k-filter-chip:hover{text-decoration:none;border-color:var(--accent);color:var(--text)}
+@media (max-width:1023.98px){
+  .k-toolbar--wide{display:none}
+  .k-filters{display:block}
+  .k-filter-chips{display:flex;flex-wrap:wrap;gap:8px}
+}
+@media (pointer:coarse){
+  .k-check,.k-filter-chip{min-height:44px}
+}

@@ -1770,3 +1770,108 @@ def test_the_note_line_only_shows_when_there_is_a_note(
         html, "Ladrillo"
     )
     assert "k-mcard__note" not in _card(html, "Grava")
+
+
+# --- Spec 007, task 7: folded filters on tablets and phones -----------------
+
+
+def _filter_panel(html: str) -> str:
+    start = html.index('<details class="k-filters">')
+    return html[start : html.index("</details>", start)]
+
+
+def _filter_chips(html: str) -> dict[str, str]:
+    """Visible text of each active-filter tag -> where its ✕ leads."""
+    return {
+        html_lib.unescape(text): html_lib.unescape(href)
+        for href, text in re.findall(
+            r'<a class="k-filter-chip" href="([^"]*)"[^>]*>([^<]*) ✕</a>', html
+        )
+    }
+
+
+def test_the_filter_panel_holds_the_three_filters_and_an_apply_button(
+    admin_client: TestClient, material: Material
+) -> None:
+    """EARS-H10-01 — no auto-submit inside: it waits for "Aplicar"."""
+    panel = _filter_panel(admin_client.get("/movements").text)
+
+    assert 'name="material_id"' in panel
+    assert panel.count('type="radio" name="type"') == 3
+    assert 'type="checkbox" name="cobro" value="sin_precio"' in panel
+    assert ">Aplicar</button>" in panel
+    assert "onchange" not in panel
+
+
+@pytest.mark.parametrize(
+    ("query", "count"),
+    [
+        ("", 0),
+        ("?type=salida", 1),
+        ("?type=salida&cobro=sin_precio", 2),
+        ("?material_id={id}&type=salida&cobro=sin_precio", 3),
+    ],
+)
+def test_the_panel_button_counts_the_active_filters(
+    admin_client: TestClient, material: Material, query: str, count: int
+) -> None:
+    """EARS-H10-03"""
+    html = admin_client.get("/movements" + query.format(id=material.id)).text
+    label = "Filtros" if count == 0 else f"Filtros · {count}"
+
+    assert f'k-filters__toggle">{label}</summary>' in html
+    assert len(_filter_chips(html)) == count
+
+
+def test_each_tag_removes_only_its_own_filter(
+    admin_client: TestClient, material: Material
+) -> None:
+    """EARS-H10-03, H10-04 — each ✕ drops one filter and keeps the others."""
+    html = admin_client.get(
+        f"/movements?material_id={material.id}&type=salida&cobro=sin_precio&page=2"
+    ).text
+    chips = _filter_chips(html)
+
+    assert set(chips) == {"Cemento", "Salidas", "Ventas sin precio"}
+    for text, dropped in (
+        ("Cemento", "material_id"),
+        ("Salidas", "type"),
+        ("Ventas sin precio", "cobro"),
+    ):
+        kept = parse_qs(urlsplit(chips[text]).query)
+        assert dropped not in kept, text
+        assert "page" not in kept, text  # back to page 1
+        assert len(kept) == 2, text
+    assert 'aria-label="Quitar filtro: Salidas"' in html
+
+
+def test_applying_the_panel_filters_like_the_desktop_toolbar(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H10-02 — the panel sends what the router already reads; "Todos"
+    and an unchecked box arrive empty and mean no filter."""
+    _history_movement(db_session, admin_user, "Ladrillo")
+    _history_movement(db_session, admin_user, "Grava", price=None)
+    _history_movement(
+        db_session,
+        admin_user,
+        "Arena",
+        movement_type=MovementType.ENTRADA,
+        reason="compra",
+        price=None,
+    )
+
+    everything = _table(admin_client.get("/movements?material_id=&type=").text)
+    unpriced = _table(
+        admin_client.get("/movements?material_id=&type=salida&cobro=sin_precio").text
+    )
+
+    assert all(name in everything for name in ("Ladrillo", "Grava", "Arena"))
+    assert "Grava" in unpriced
+    assert "Ladrillo" not in unpriced and "Arena" not in unpriced
+
+
+def test_no_other_screen_folds_its_filters(admin_client: TestClient) -> None:
+    """EARS-H10-06 — Artículos has only two controls, the rest none to fold."""
+    for page in ("/", "/materials", "/payments", "/users"):
+        assert "k-filters" not in admin_client.get(page).text, page
