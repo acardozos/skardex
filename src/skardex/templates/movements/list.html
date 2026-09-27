@@ -4,7 +4,7 @@
 {% block title %}Movimientos — Simple Kardex{% endblock %}
 
 {% block content %}
-<main class="k-main">
+<main class="k-main k-main--wide">
     <div class="k-page-head">
         <div>
             <p class="k-eyebrow">Historial</p>
@@ -38,8 +38,19 @@
 
     {{ pager_summary(pg) }}
 
+    {#- "Corregir cobro" for a movement, the same in the table and in its card:
+        the admin gets it on every salida (it can turn one into a sale), never
+        on an entrada; the operario never. -#}
+    {% macro fix_link(movement, is_admin, here) -%}
+    {% if is_admin and movement.type == "salida" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
+    {%- endmacro %}
+
     <div class="k-card">
-        <table class="k-table k-table--stacked">
+        {#- Desktop: the real table, all 10 columns. Touch screens and narrow
+            windows get the cards below instead (spec 007, H2). -#}
+        <p class="k-scroll__hint" id="movements-hint" hidden>Desliza para ver más columnas →</p>
+        <div class="k-scroll" id="movements-scroll">
+        <table class="k-table k-table--wide" id="movements-table">
             <thead>
                 <tr>
                     <th>Fecha</th>
@@ -56,37 +67,79 @@
             </thead>
             <tbody>
                 {% for movement in movements %}
-                {% set fix_link %}{% if is_admin and movement.type == "salida" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}{% endset %}
+                {% set fix = fix_link(movement, is_admin, here) %}
                 <tr>
-                    <td data-label="Fecha" class="k-dim">{{ movement.movement_date.strftime('%d/%m/%Y') }}</td>
-                    <td data-label="Artículo" class="k-strong">{{ movement.material.name }}</td>
-                    <td data-label="Tipo"><span class="k-tag {{ 'k-tag--ok' if movement.type == 'entrada' else 'k-tag--neutral' }}">{{ "Entrada" if movement.type == "entrada" else "Salida" }}</span></td>
-                    <td data-label="Cantidad" class="k-num">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</td>
-                    <td data-label="Motivo" class="k-dim">
+                    <td class="k-dim">{{ movement.movement_date.strftime('%d/%m/%Y') }}</td>
+                    <td class="k-strong">{{ movement.material.name }}</td>
+                    <td><span class="k-tag {{ 'k-tag--ok' if movement.type == 'entrada' else 'k-tag--neutral' }}">{{ "Entrada" if movement.type == "entrada" else "Salida" }}</span></td>
+                    <td class="k-num">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</td>
+                    <td class="k-dim">
                         {%- if movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
                         {%- else -%}Sin motivo{%- endif -%}
                     </td>
                     {% if movement.reason == "venta" and movement.unit_price is none %}
-                    <td data-label="Precio unit." class="k-num"><span class="k-tag k-tag--warn">Sin precio</span></td>
-                    <td data-label="Monto" class="k-num k-dim">-</td>
-                    <td data-label="Cobro" class="k-dim">{{ fix_link or "-" }}</td>
+                    <td class="k-num"><span class="k-tag k-tag--warn">Sin precio</span></td>
+                    <td class="k-num k-dim">-</td>
+                    <td class="k-dim">{{ fix or "-" }}</td>
                     {% elif movement.reason == "venta" %}
-                    <td data-label="Precio unit." class="k-num">{{ movement.unit_price | cop }}</td>
-                    <td data-label="Monto" class="k-num k-strong">{{ movement.amount | cop }}</td>
-                    <td data-label="Cobro">
-                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %} {{ fix_link }}
+                    <td class="k-num">{{ movement.unit_price | cop }}</td>
+                    <td class="k-num k-strong">{{ movement.amount | cop }}</td>
+                    <td>
+                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %} {{ fix }}
                     </td>
                     {% else %}
-                    <td data-label="Precio unit." class="k-num k-dim">-</td>
-                    <td data-label="Monto" class="k-num k-dim">-</td>
-                    <td data-label="Cobro" class="k-dim">{{ fix_link or "-" }}</td>
+                    <td class="k-num k-dim">-</td>
+                    <td class="k-num k-dim">-</td>
+                    <td class="k-dim">{{ fix or "-" }}</td>
                     {% endif %}
-                    <td data-label="Usuario" class="k-dim">{{ movement.user.username }}</td>
-                    <td data-label="Observación" class="k-dim k-cell--wide">{{ movement.note or "-" }}</td>
+                    <td class="k-dim">{{ movement.user.username }}</td>
+                    <td class="k-dim">{{ movement.note or "-" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        </div>
+
+        {#- One compact card per movement. The quantity's class and whether the
+            billing line shows are worked out once, here, so a new movement
+            type (Traslado, spec 009) adds a branch instead of a redesign. -#}
+        <ul class="k-mcards" id="movements-cards">
+            {% for movement in movements %}
+            {% set fix = fix_link(movement, is_admin, here) %}
+            {% set is_sale = movement.reason == "venta" %}
+            {% set qty_class = "k-mcard__qty--in" if movement.type == "entrada" else "" %}
+            {% set has_billing_line = is_sale or fix %}
+            <li class="k-mcard">
+                <div class="k-mcard__main">
+                    <span class="k-strong">{{ movement.material.name }}</span>
+                    <span class="k-num k-mcard__qty {{ qty_class }}">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
+                </div>
+                <p class="k-mcard__meta k-meta">
+                    <span>{{ movement.movement_date.strftime('%d/%m/%Y') }}</span>
+                    {%- if movement.reason %}<span>{{ reason_labels.get(movement.reason, movement.reason) }}</span>{% else %}<span>Sin motivo</span>{% endif -%}
+                    <span>{{ movement.user.username }}</span>
+                </p>
+                {% if has_billing_line %}
+                <div class="k-mcard__billing">
+                    {% if is_sale %}
+                    <span class="k-mcard__amount">
+                        {%- if movement.unit_price is none -%}
+                        <span class="k-tag k-tag--warn">Sin precio</span>
+                        {%- else -%}
+                        <span class="k-num k-strong">{{ movement.amount | cop }}</span>
+                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
+                        {%- endif -%}
+                    </span>
+                    {% endif %}
+                    {{ fix }}
+                </div>
+                {% endif %}
+                {% if movement.note %}
+                <p class="k-mcard__note">{{ movement.note }}</p>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
 
         {% if not movements %}
         <div class="k-empty">
@@ -105,4 +158,17 @@
 
     {{ pager(pg, "/movements", params) }}
 </main>
+
+<script>
+  // The hint shows only while the table is wider than its box (and the box
+  // is visible at all: with the cards shown it measures zero).
+  (function () {
+    const box = document.getElementById("movements-scroll");
+    const hint = document.getElementById("movements-hint");
+    if (!box || !hint || !window.ResizeObserver) return;
+    new ResizeObserver(() => {
+      hint.hidden = box.scrollWidth <= box.clientWidth;
+    }).observe(box);
+  })();
+</script>
 {% endblock %}

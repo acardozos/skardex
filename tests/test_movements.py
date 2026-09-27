@@ -1193,8 +1193,10 @@ def _add_history(
 
 
 def _rows(html: str) -> list[str]:
-    """The notes of the rows shown, in display order."""
-    return re.findall(r"fila\d{3}", html)
+    """The notes of the rows shown, in display order. Only the desktop table:
+    since spec 007 each movement also has a card with the same note."""
+    table = html[html.index('id="movements-table"') : html.index("</table>")]
+    return re.findall(r"fila\d{3}", table)
 
 
 def _links(html: str) -> list[str]:
@@ -1631,3 +1633,140 @@ def test_the_cookie_is_remembered_per_browser_not_per_user(
     operario_client.get("/movements?per_page=25")
 
     assert len(_rows(operario_client.get("/movements").text)) == 25
+
+
+# --- Spec 007, task 6: wide desktop table and compact cards -----------------
+
+
+def _card(html: str, name: str) -> str:
+    """The card (<li>) of the movement on the given material."""
+    cards = html[html.index('id="movements-cards"') : html.index("</ul>")]
+    found = [c for c in cards.split('<li class="k-mcard">')[1:] if f">{name}<" in c]
+    assert len(found) == 1, f"expected one card for {name!r}, got {len(found)}"
+    return found[0].split("</li>")[0]
+
+
+def test_movimientos_has_the_table_and_the_cards_on_a_wider_page(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H2-02, H2-04 — CSS shows one or the other; only this page is wider."""
+    _history_movement(db_session, admin_user, "Cemento")
+
+    html = admin_client.get("/movements").text
+
+    assert '<main class="k-main k-main--wide">' in html
+    assert 'id="movements-table"' in html and 'id="movements-cards"' in html
+    assert 'id="movements-hint" hidden' in html
+    for other in ("/", "/materials", "/payments", "/users"):
+        assert "k-main--wide" not in admin_client.get(other).text, other
+
+
+def test_the_wide_table_keeps_its_first_column_in_place(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H2-03 (the CSS side; that it works is checked on captures)."""
+    css = admin_client.get("/static/css/kardex.css").text
+
+    assert ".k-table--wide{border-collapse:separate;border-spacing:0}" in css
+    assert (
+        ".k-table--wide th:first-child,.k-table--wide td:first-child"
+        "{position:sticky;left:0;z-index:1}"
+    ) in css
+    shows_cards = css.index("@media (max-width:1023.98px),(pointer:coarse){")
+    assert css.index(".k-mcards{display:none") < shows_cards
+
+
+def test_a_card_shows_item_quantity_date_reason_and_user(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H2-05 — no field labels; an entrada's quantity in green."""
+    _history_movement(
+        db_session,
+        admin_user,
+        "Arena",
+        movement_type=MovementType.ENTRADA,
+        quantity="2.5",
+        reason="compra",
+        price=None,
+    )
+
+    card = _card(admin_client.get("/movements").text, "Arena")
+
+    assert '<span class="k-strong">Arena</span>' in card
+    assert 'class="k-num k-mcard__qty k-mcard__qty--in">+2.500 kg</span>' in card
+    assert "<span>10/09/2026</span><span>Compra</span><span>admin</span>" in card
+    assert "data-label" not in card
+
+
+def test_the_billing_line_shows_for_sales_with_amount_or_sin_precio(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H2-06"""
+    _history_movement(db_session, admin_user, "Ladrillo", quantity="3")
+    _history_movement(db_session, admin_user, "Grava", price=None)
+    _history_movement(db_session, admin_user, "Varilla", paid_on=date(2026, 9, 12))
+    html = admin_client.get("/movements").text
+
+    pending = _card(html, "Ladrillo")
+    assert '<span class="k-num k-strong">$ 3.000,00</span>' in pending
+    assert '<span class="k-tag">Pendiente</span>' in pending
+    assert '<span class="k-tag k-tag--warn">Sin precio</span>' in _card(html, "Grava")
+    paid = _card(html, "Varilla")
+    assert '<span class="k-tag k-tag--ok">Pagada</span>' in paid
+    assert "12/09/2026" in paid
+
+
+def test_the_admin_can_correct_any_salida_from_its_card(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H2-07, H2-08 — a non-sale salida gets a billing line with just the
+    button; an entrada never gets one."""
+    sale = _history_movement(db_session, admin_user, "Ladrillo")
+    waste = _history_movement(
+        db_session, admin_user, "Arena", reason="merma", price=None
+    )
+    _history_movement(
+        db_session,
+        admin_user,
+        "Cemento",
+        movement_type=MovementType.ENTRADA,
+        reason="compra",
+        price=None,
+    )
+    html = admin_client.get("/movements").text
+
+    assert f"/movements/{sale.id}/billing" in _card(html, "Ladrillo")
+    waste_card = _card(html, "Arena")
+    assert 'class="k-mcard__billing"' in waste_card
+    assert f"/movements/{waste.id}/billing" in waste_card
+    assert "k-mcard__amount" not in waste_card
+    assert "k-mcard__billing" not in _card(html, "Cemento")
+
+
+def test_the_operario_never_sees_corregir_cobro_on_a_card(
+    operario_client: TestClient, operario_user: User, db_session: Session
+) -> None:
+    """EARS-H2-07, H2-08"""
+    _history_movement(db_session, operario_user, "Ladrillo")
+    _history_movement(db_session, operario_user, "Arena", reason="merma", price=None)
+    html = operario_client.get("/movements").text
+
+    sale = _card(html, "Ladrillo")
+    assert "k-mcard__billing" in sale and "Corregir cobro" not in sale
+    assert "k-mcard__billing" not in _card(html, "Arena")
+
+
+def test_the_note_line_only_shows_when_there_is_a_note(
+    admin_client: TestClient, admin_user: User, db_session: Session
+) -> None:
+    """EARS-H2-10, H5-04 — no "Observación: -" in a card."""
+    with_note = _history_movement(db_session, admin_user, "Ladrillo")
+    with_note.note = "para el taller de Juan"
+    db_session.commit()
+    _history_movement(db_session, admin_user, "Grava")
+    html = admin_client.get("/movements").text
+
+    assert '<p class="k-mcard__note">para el taller de Juan</p>' in _card(
+        html, "Ladrillo"
+    )
+    assert "k-mcard__note" not in _card(html, "Grava")
