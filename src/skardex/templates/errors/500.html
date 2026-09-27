@@ -2,9 +2,12 @@
 
 {% block title %}Algo falló de nuestro lado — Simple Kardex{% endblock %}
 
+{% from "_logo.html" import logo_without_header with context %}
+
 {% block content %}
 <main class="k-main">
     <div class="k-errorpage">
+        {{ logo_without_header("k-errorpage__logo", 32) }}
         <div class="k-errorpage__code">500</div>
         <h1>Algo falló de nuestro lado</h1>
         <p>Vuelve a intentarlo en un momento. Si sigue pasando, avisa al administrador.</p>

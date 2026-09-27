@@ -73,7 +73,8 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 /* ---------- Header + navegación ---------- */
 .k-header{position:sticky;top:0;z-index:30;background:var(--nav-bg);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .k-header__inner{max-width:1040px;margin:0 auto;padding:0 20px;min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.k-brand{display:flex;align-items:baseline;gap:8px;color:var(--text)}
+.k-brand{display:flex;align-items:center;gap:8px;color:var(--text);white-space:nowrap}
+.k-brand__logo{display:block;flex:none}
 .k-brand:hover{text-decoration:none;color:var(--text)}
 .k-brand__name{font-size:16px;font-weight:700;letter-spacing:-0.02em}
 .k-brand__meta{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
@@ -81,10 +82,24 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-nav__link{padding:8px 13px;border-radius:8px;font-size:14px;font-weight:500;color:var(--muted)}
 .k-nav__link:hover{color:var(--text);text-decoration:none}
 .k-nav__link.is-active{background:var(--surface2);color:var(--text)}
-.k-session{display:flex;align-items:center;gap:12px}
-.k-session form{margin:0}
-.k-user{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--muted)}
+.k-user{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--muted);white-space:nowrap}
 .k-user__avatar{width:22px;height:22px;border-radius:50%;background:var(--tag-bg);color:var(--tag-c);font-size:11px;font-weight:700;display:grid;place-items:center}
+
+/* Session menu (spec 007): user, theme and logout grouped in one <details>,
+   the same no-JavaScript pattern as the mobile menu below. */
+.k-usermenu{position:relative}
+.k-usermenu summary{list-style:none;cursor:pointer}
+.k-usermenu summary::-webkit-details-marker{display:none}
+.k-usermenu summary:hover,.k-usermenu[open] summary,.k-usermenu summary.is-active{color:var(--text);border-color:var(--accent)}
+.k-usermenu__panel{position:absolute;right:0;top:calc(100% + 10px);min-width:220px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:8px;display:flex;flex-direction:column;gap:2px;z-index:40}
+.k-usermenu__panel form{margin:0}
+.k-usermenu__panel a,.k-usermenu__item{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:none;border-radius:8px;background:none;font:inherit;font-size:14px;font-weight:500;color:var(--muted);text-align:left;cursor:pointer}
+.k-usermenu__panel a:hover,.k-usermenu__item:hover{color:var(--text);background:var(--surface2);text-decoration:none}
+.k-usermenu__panel a.is-active{background:var(--surface2);color:var(--text)}
+/* Theme button shows the active theme's emoji, chosen by CSS alone. */
+.k-theme__icon--light{display:none}
+[data-theme="light"] .k-theme__icon--dark{display:none}
+[data-theme="light"] .k-theme__icon--light{display:inline}
 
 /* menú móvil: <details>, sin JavaScript */
 .k-menu{display:none;position:relative}
@@ -159,9 +174,13 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-actions{display:flex;gap:8px;justify-content:flex-end}
 .k-actions form{margin:0}
 
-@media (max-width:880px){
-  .k-nav,.k-session{display:none}
+/* Menu breakpoint (spec 007): horizontal while it fits on one line. */
+@media (max-width:1023.98px){
+  .k-nav,.k-usermenu{display:none}
   .k-menu{display:block}
+}
+
+@media (max-width:880px){
   .k-table thead{display:none}
   .k-table tr{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;padding:14px 16px;border-bottom:1px solid var(--border)}
   .k-table td{display:block;padding:0;border:none;text-align:left}
@@ -226,9 +245,11 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-center{min-height:100vh;display:grid;place-items:center;padding:32px 20px}
 .k-auth{width:100%;max-width:380px}
 .k-auth__head{display:flex;flex-direction:column;gap:4px;margin-bottom:24px}
+.k-auth__logo{display:block;margin-bottom:10px}
 .k-auth__head h1{font-size:30px;letter-spacing:-0.03em}
 .k-auth__head p{margin:0;color:var(--muted);font-size:15px}
 .k-errorpage{max-width:520px;margin:0 auto;text-align:center;padding:12vh 0}
+.k-errorpage__logo,.k-formcard__logo{display:block;margin:0 auto 16px}
 .k-errorpage__code{font-size:64px;font-weight:700;letter-spacing:-0.03em;line-height:1;color:var(--accent)}
 .k-errorpage h1{margin:14px 0 8px;font-size:24px}
 .k-errorpage p{margin:0 0 26px;color:var(--muted);font-size:15px}
@@ -252,3 +273,24 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 .k-secret p:last-child{margin:0}
 .k-secret__value{font-size:20px;letter-spacing:.1em;font-weight:600}
 .k-secret__row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+
+/* ---------- Low screens: phone in landscape (spec 007, H8) ---------- */
+/* Little height: nothing centered on 100vh, the header scrolls away, and
+   menu panels scroll on their own so every link can be reached. */
+@media (max-height:499.98px){
+  .k-header{position:static}
+  .k-menu__panel,.k-usermenu__panel{max-height:calc(100vh - 72px);overflow-y:auto}
+  .k-center{min-height:0;place-items:start center;padding:16px 20px}
+  .k-errorpage{padding:24px 0}
+  .k-auth__head{display:grid;grid-template-columns:40px 1fr;column-gap:12px;row-gap:2px;align-items:center;margin-bottom:14px}
+  .k-auth__logo{width:40px;height:40px;margin:0;grid-row:1 / span 3}
+}
+/* ...and wide enough: forms use the width instead of the height, pairing
+   fields. Only .k-field children pair; anything else (rows that already
+   hold two fields, notes, actions, the login button) spans both columns. */
+@media (max-height:499.98px) and (min-width:600px){
+  .k-auth{max-width:640px}
+  .k-formcard,.k-formcard--narrow{max-width:720px}
+  .k-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+  .k-form > :not(.k-field),.k-form > .k-form__full{grid-column:1 / -1}
+}

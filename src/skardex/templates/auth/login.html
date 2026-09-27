@@ -2,10 +2,13 @@
 
 {% block title %}Iniciar sesión — Simple Kardex{% endblock %}
 
+{% from "_logo.html" import app_logo with context %}
+
 {% block content %}
 <div class="k-center">
     <div class="k-auth">
         <div class="k-auth__head">
+            {{ app_logo("k-auth__logo", 52) }}
             <p class="k-eyebrow">Control de inventario</p>
             <h1>Simple Kardex</h1>
             <p>Ingresa con tu usuario y contraseña.</p>

@@ -2,9 +2,12 @@
 
 {% block title %}No tienes acceso a esta página — Simple Kardex{% endblock %}
 
+{% from "_logo.html" import logo_without_header with context %}
+
 {% block content %}
 <main class="k-main">
     <div class="k-errorpage">
+        {{ logo_without_header("k-errorpage__logo", 32) }}
         <div class="k-errorpage__code">403</div>
         <h1>No tienes acceso a esta página</h1>
         <p>Esta sección es solo para el administrador. Si crees que es un error, pídele acceso al dueño.</p>

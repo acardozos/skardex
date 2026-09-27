@@ -1,0 +1,17 @@
+{#- The app logo (spec 007, H7). Always decorative: the name "Simple Kardex"
+    is right next to it or in the page title, so it carries an empty alt.
+    Import it `with context`, since it needs `request`. -#}
+{% macro app_logo(class_name, size) -%}
+<img class="{{ class_name }}" src="{{ url_for('static', path='img/skardex.svg') }}" width="{{ size }}" height="{{ size }}" alt="">
+{%- endmacro %}
+
+{#- True when base.html draws the header, which already carries the logo. -#}
+{% macro header_shown() -%}
+{{ "1" if request.session.get("user_id") and not hide_nav else "" }}
+{%- endmacro %}
+
+{#- For pages that may render without the header (errors, set_password):
+    shows the logo only then, so a signed-in user never sees it twice. -#}
+{% macro logo_without_header(class_name, size) -%}
+{% if not header_shown() %}{{ app_logo(class_name, size) }}{% endif %}
+{%- endmacro %}

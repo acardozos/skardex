@@ -2,9 +2,12 @@
 
 {% block title %}Página no encontrada — Simple Kardex{% endblock %}
 
+{% from "_logo.html" import logo_without_header with context %}
+
 {% block content %}
 <main class="k-main">
     <div class="k-errorpage">
+        {{ logo_without_header("k-errorpage__logo", 32) }}
         <div class="k-errorpage__code">404</div>
         <h1>Página no encontrada</h1>
         <p>La dirección que abriste no existe o el registro fue desactivado.</p>

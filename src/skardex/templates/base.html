@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{% block title %}Simple Kardex{% endblock %}</title>
     <script>
       document.documentElement.dataset.theme = localStorage.getItem('kardex-theme') || '';
@@ -17,10 +17,17 @@
     <script src="https://unpkg.com/htmx.org@2" defer></script>
 </head>
 <body>
-{% if request.session.get("user_id") and not hide_nav %}
+{% from "_logo.html" import app_logo, header_shown with context %}
+{#- Shows the emoji of the active theme; CSS picks one from [data-theme], so
+    it is right from the first paint, before any script runs. -#}
+{% set theme_icon %}<span class="k-theme__icon--dark" aria-hidden="true">🌙</span><span class="k-theme__icon--light" aria-hidden="true">☀️</span>{% endset %}
+{% set role_label = "Admin" if request.session.get("role") == "admin" else "Operario" %}
+{% set on_account = request.url.path.startswith('/account') %}
+{% if header_shown() %}
 <header class="k-header">
     <div class="k-header__inner">
         <a class="k-brand" href="/">
+            {{ app_logo("k-brand__logo", 26) }}
             <span class="k-brand__name">Simple Kardex</span>
             <span class="k-brand__meta">Zona 58</span>
         </a>
@@ -35,16 +42,18 @@
             {% endif %}
         </nav>
 
-        <div class="k-session">
-            <span class="k-user">
-                <span class="k-user__avatar">{{ request.session.get("username", "")[:2].upper() }}</span>{{ request.session.get("username") }} · {{ "Admin" if request.session.get("role") == "admin" else "Operario" }}
-            </span>
-            <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
-            <a class="k-btn k-btn--ghost k-btn--sm{% if request.url.path.startswith('/account') %} is-active{% endif %}" href="/account/password">Mi cuenta</a>
-            <form method="post" action="/logout">
-                <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Salir</button>
-            </form>
-        </div>
+        <details class="k-usermenu">
+            <summary class="k-user{% if on_account %} is-active{% endif %}" aria-label="Menú de {{ request.session.get('username') }}">
+                <span class="k-user__avatar">{{ request.session.get("username", "")[:2].upper() }}</span>{{ request.session.get("username") }} · {{ role_label }}
+            </summary>
+            <div class="k-usermenu__panel">
+                <a class="{% if on_account %}is-active{% endif %}" href="/account/password">Mi cuenta</a>
+                <button type="button" class="k-usermenu__item" onclick="kardexTheme()">{{ theme_icon }} Cambiar tema</button>
+                <form method="post" action="/logout">
+                    <button type="submit" class="k-usermenu__item">Salir</button>
+                </form>
+            </div>
+        </details>
 
         <details class="k-menu">
             <summary class="k-menu__toggle" aria-label="Abrir menú">☰</summary>
@@ -56,10 +65,10 @@
                 {% if request.session.get("role") == "admin" %}
                 <a class="{% if request.url.path.startswith('/users') %}is-active{% endif %}" href="/users">Usuarios</a>
                 {% endif %}
-                <a class="{% if request.url.path.startswith('/account') %}is-active{% endif %}" href="/account/password">Mi cuenta</a>
+                <a class="{% if on_account %}is-active{% endif %}" href="/account/password">Mi cuenta</a>
                 <div class="k-menu__foot">
-                    <span>{{ request.session.get("username") }} · {{ "Admin" if request.session.get("role") == "admin" else "Operario" }}</span>
-                    <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">🌙</button>
+                    <span>{{ request.session.get("username") }} · {{ role_label }}</span>
+                    <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">{{ theme_icon }}</button>
                     <form method="post" action="/logout">
                         <button type="submit" class="k-btn k-btn--ghost k-btn--sm">Salir</button>
                     </form>
