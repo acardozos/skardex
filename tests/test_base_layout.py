@@ -177,10 +177,11 @@ def test_every_theme_button_carries_both_icons(admin_client: TestClient) -> None
 
 
 def _logos(html: str) -> list[tuple[str, str]]:
-    """(class, size) of every logo <img> on the page (url_for makes the src
-    absolute, so match on the file name)."""
+    """(class, size) of every logo <img> on the page, matched on the file
+    name (its URL carries a content version since T5)."""
     return re.findall(
-        r'<img class="([\w-]+)" src="[^"]*/static/img/skardex\.svg" width="(\d+)"',
+        r'<img class="([\w-]+)" src="[^"]*/static/img/skardex\.svg(?:\?v=\w+)?" '
+        r'width="(\d+)"',
         html,
     )
 

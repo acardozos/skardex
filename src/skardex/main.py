@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -18,11 +17,11 @@ from skardex.routers import (
     users,
 )
 from skardex.security import NotAuthenticatedError, PasswordChangeRequiredError
+from skardex.static_files import STATIC_DIR
 from skardex.templating import templates
 
 logger = logging.getLogger("skardex")
 
-STATIC_DIR = Path(__file__).parent / "static"
 
 _ERROR_TEMPLATES = {
     status.HTTP_403_FORBIDDEN: "errors/403.html",

@@ -10,6 +10,7 @@ from skardex.constants import (
 )
 from skardex.money import format_cop
 from skardex.pagination import PER_PAGE_OPTIONS, build_url
+from skardex.static_files import static_url
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -19,4 +20,5 @@ templates.env.globals["entrada_reasons"] = ENTRADA_REASONS
 templates.env.globals["salida_reasons"] = SALIDA_REASONS
 templates.env.globals["per_page_options"] = PER_PAGE_OPTIONS
 templates.env.globals["page_url"] = build_url
+templates.env.globals["static_url"] = static_url
 templates.env.filters["cop"] = format_cop
