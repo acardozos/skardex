@@ -89,7 +89,7 @@
     </div>
     {% endif %}
 
-    {{ pager_summary(pg) }}
+    {{ pager_summary(pg, "/movements", params) }}
 
     {#- "Corregir cobro" for a movement, the same in the table and in its card:
         the admin gets it on every salida (it can turn one into a sale), never

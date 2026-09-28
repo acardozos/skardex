@@ -5,15 +5,36 @@
     Above the list goes `pager_summary` (just how many rows); below it goes
     `pager` (the controls). Page-size links drop `page` (back to page 1). -#}
 
-{% macro pager_summary(pg) %}
+{#- The line above the list: the summary and, on desktop only (CSS), a
+    compact Previous / "Página X de Y" / Next with the very same links as the
+    controls below, so paging never needs scrolling to the end (spec 007,
+    H9-05). It adds to the controls below; it replaces nothing there. -#}
+{% macro pager_summary(pg, base_path, params) %}
 {% if pg.total > 0 %}
-<p class="k-pager__summary">Mostrando {{ pg.first }}–{{ pg.last }} de {{ pg.total }}</p>
+<div class="k-pager__top">
+    <p class="k-pager__summary">Mostrando {{ pg.first }}–{{ pg.last }} de {{ pg.total }}</p>
+    {% if pg.pages > 1 %}
+    <nav class="k-pager__compact" aria-label="Páginas (arriba)">
+        {% if pg.has_prev %}
+        <a class="k-pager__link" rel="prev" href="{{ page_url(base_path, params, page=pg.page - 1, per_page=pg.per_page) }}">‹ Anterior</a>
+        {% else %}
+        <span class="k-pager__link is-disabled" aria-disabled="true">‹ Anterior</span>
+        {% endif %}
+        <span class="k-pager__pos">Página {{ pg.page }} de {{ pg.pages }}</span>
+        {% if pg.has_next %}
+        <a class="k-pager__link" rel="next" href="{{ page_url(base_path, params, page=pg.page + 1, per_page=pg.per_page) }}">Siguiente ›</a>
+        {% else %}
+        <span class="k-pager__link is-disabled" aria-disabled="true">Siguiente ›</span>
+        {% endif %}
+    </nav>
+    {% endif %}
+</div>
 {% endif %}
 {% endmacro %}
 
 {% macro pager(pg, base_path, params) %}
 {% if pg.total > 0 %}
-<div class="k-pager">
+<div class="k-pager"{{ ' data-paged' if pg.pages > 1 else '' }}>
     {#- With a single page there is nowhere to go: no Previous/Next at all. -#}
     {% if pg.pages > 1 %}
     <nav class="k-pager__nav" aria-label="Páginas">

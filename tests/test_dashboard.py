@@ -364,8 +364,8 @@ def test_the_balances_table_disables_previous_and_next_at_the_ends(
     """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _stock(db_session, 23)
 
-    first = admin_client.get("/").text
-    last = admin_client.get("/?page=3").text
+    first = _below(admin_client.get("/").text)
+    last = _below(admin_client.get("/?page=3").text)
 
     assert first.count('aria-disabled="true">Anterior') == 1
     assert first.count('aria-disabled="true">Siguiente') == 0
@@ -731,3 +731,8 @@ def test_the_low_stock_filter_keeps_both_shortcuts(
 
     assert 'id="low-stock-link" href="/?bajo_minimo=1"' in html
     assert "Solo bajo el mínimo</a>" in html
+
+
+def _below(html: str) -> str:
+    """The full controls under the list (spec 007 added compact ones above)."""
+    return html[html.index('class="k-pager"') :]

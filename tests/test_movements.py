@@ -1386,9 +1386,9 @@ def test_previous_and_next_are_disabled_at_the_ends(
     """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _add_history(db_session, admin_user, material, 23)
 
-    first = admin_client.get("/movements").text
-    middle = admin_client.get("/movements?page=2").text
-    last = admin_client.get("/movements?page=3").text
+    first = _below(admin_client.get("/movements").text)
+    middle = _below(admin_client.get("/movements?page=2").text)
+    last = _below(admin_client.get("/movements?page=3").text)
 
     disabled = 'is-disabled" aria-disabled="true">'
     assert first.count(f"{disabled}Anterior") == 1
@@ -1875,3 +1875,81 @@ def test_no_other_screen_folds_its_filters(admin_client: TestClient) -> None:
     """EARS-H10-06 — Artículos has only two controls, the rest none to fold."""
     for page in ("/", "/materials", "/payments", "/users"):
         assert "k-filters" not in admin_client.get(page).text, page
+
+
+def _below(html: str) -> str:
+    """The full controls under the list (spec 007 added compact ones above)."""
+    return html[html.index('class="k-pager"') :]
+
+
+# --- Spec 007, task 8.5: compact paging above the list on desktop ----------
+
+
+def _above(html: str) -> str:
+    start = html.index('<div class="k-pager__top">')
+    return html[start : html.index("</div>", html.index("k-pager__summary", start))]
+
+
+def test_the_line_above_adds_compact_paging_with_the_same_links(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H9-05 — same page_url links as below (same filters, same size);
+    it adds to the controls below, which keep everything."""
+    _add_history(db_session, admin_user, material, 23)
+
+    html = admin_client.get("/movements?page=2&type=entrada&per_page=10").text
+    above, below = _above(html), _below(html)
+
+    def links(block: str, rel: str) -> list[str]:
+        return re.findall(rf'rel="{rel}" href="([^"]*)"', block)
+
+    assert "Mostrando 11–20 de 23" in above
+    assert "Página 2 de 3" in above
+    assert links(above, "prev") == links(below, "prev") != []
+    assert links(above, "next") == links(below, "next") != []
+    assert "Filas por página" not in above
+    assert "Filas por página" in below
+    assert "Página 2 de 3" in below
+
+
+def test_a_single_page_has_no_compact_paging_above(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H9-05"""
+    _add_history(db_session, admin_user, material, 5)
+
+    html = admin_client.get("/movements").text
+
+    assert "k-pager__compact" not in html
+    assert "Mostrando 1–5 de 5" in html
+
+
+def test_paging_sits_on_the_right_both_above_and_below_on_desktop(
+    admin_client: TestClient,
+    admin_user: User,
+    material: Material,
+    db_session: Session,
+) -> None:
+    """EARS-H9-05 (user's review, 2026-09-27): where paging shows above and
+    below, both sit on the right and "Filas por página" goes left below.
+    Only with more than one page: alone, the selector stays on the right."""
+    _add_history(db_session, admin_user, material, 23)
+    paged = admin_client.get("/movements").text
+    db_session.query(Movement).delete()
+    db_session.commit()
+    _add_history(db_session, admin_user, material, 5)
+    single = admin_client.get("/movements").text
+    css = admin_client.get("/static/css/kardex.css").text
+
+    assert '<div class="k-pager" data-paged>' in paged
+    assert '<div class="k-pager">' in single
+    desktop = css[css.index("and (pointer:fine){\n  .k-pager__compact{display:flex}") :]
+    desktop = desktop[: desktop.index("\n}")]
+    assert ".k-pager[data-paged] .k-pager__size{order:-1;margin-left:0}" in desktop
+    assert ".k-pager[data-paged] .k-pager__nav{margin-left:auto}" in desktop

@@ -45,7 +45,7 @@
         </nav>
     </div>
 
-    {% if pg %}{{ pager_summary(pg) }}{% endif %}
+    {% if pg %}{{ pager_summary(pg, "/payments", params) }}{% endif %}
 
     {% set can_pay = user.role == "admin" and estado == "pendientes" and sales %}
     {% set all_checked = selected_ids is none or selected_ids | length == sales | length %}
@@ -57,7 +57,7 @@
             <input class="k-input" type="date" id="paid_on" name="paid_on" value="{{ paid_on or today }}" max="{{ today }}" required>
         </div>
     {% endif %}
-    <div class="k-card">
+    <div class="k-card k-card--sticky-head">
         {#- 720px and up: the table. Its checkboxes are the only ones that are
             sent (`name="movement_ids"`), even while CSS hides the table. -#}
         <table class="k-table k-table--sales" id="sales-table">

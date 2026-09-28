@@ -816,8 +816,8 @@ def test_the_paid_view_disables_previous_and_next_at_the_ends(
     """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _sales(make_sale, admin_user, material, 23, paid=True)
 
-    first = admin_client.get("/payments?estado=pagados").text
-    last = admin_client.get("/payments?estado=pagados&page=3").text
+    first = _below(admin_client.get("/payments?estado=pagados").text)
+    last = _below(admin_client.get("/payments?estado=pagados&page=3").text)
 
     assert first.count('aria-disabled="true">Anterior') == 1
     assert first.count('aria-disabled="true">Siguiente') == 0
@@ -1085,3 +1085,8 @@ def test_the_fixed_bar_keeps_its_middle_block_to_two_lines(
     assert ".k-paybar__sum .k-label{position:absolute;width:1px;height:1px" in narrow
     assert "#selected-total{font-size:15px;font-size:clamp(12px,10cqi,15px)}" in narrow
     assert "#selected-count{display:block;font-size:12px;white-space:nowrap}" in narrow
+
+
+def _below(html: str) -> str:
+    """The full controls under the list (spec 007 added compact ones above)."""
+    return html[html.index('class="k-pager"') :]

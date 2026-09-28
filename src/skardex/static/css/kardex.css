@@ -446,3 +446,34 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 @media (pointer:coarse){
   .k-pick{min-width:44px;min-height:44px}
 }
+
+/* ---------- Desktop paging and sticky headers (spec 007, H9-05/06) ---------- */
+/* The line above a list: the summary on the left and, on desktop, compact
+   paging on the right. Plain small links, not buttons, so the line keeps
+   the height it had with the summary alone. */
+.k-pager__top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px}
+.k-pager__compact{display:none;align-items:center;gap:12px;font-size:13px}
+.k-pager__link{color:var(--accent);font-weight:500}
+.k-pager__link.is-disabled{color:var(--muted);opacity:0.6;pointer-events:none}
+/* Mouse only (pointer:fine): a landscape tablet is 1024px wide too, and
+   these small links are no 44px touch target. Touch keeps the full
+   controls below. */
+@media (min-width:1024px) and (min-height:500px) and (pointer:fine){
+  .k-pager__compact{display:flex}
+  /* With paging both above and below, keep it on the same side: the size
+     selector moves left and the paging goes right, under its twin above. */
+  .k-pager[data-paged] .k-pager__size{order:-1;margin-left:0}
+  .k-pager[data-paged] .k-pager__nav{margin-left:auto}
+}
+/* Column headers stay under the app header while the page scrolls. The card
+   must stop being a scroll container for that: overflow-x:auto makes it one
+   (and turns overflow-y into auto too), and a sticky cell inside it cannot
+   stick to the page. `clip` still clips the rounded corners without that
+   effect; a browser without `clip` keeps `auto` and simply no sticky header.
+   Trade-off: a table wider than its card would be cut with no sign of it;
+   at 1024px and up these tables fit (checked on captures, task 9).
+   Movimientos is left out: it scrolls sideways on purpose. */
+@media (min-width:1024px) and (min-height:500px){
+  .k-card--sticky-head{overflow-x:clip}
+  .k-card--sticky-head .k-table thead th{position:sticky;top:56px;z-index:2;box-shadow:inset 0 -1px 0 var(--border)}
+}

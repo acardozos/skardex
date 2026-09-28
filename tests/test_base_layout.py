@@ -228,3 +228,27 @@ def test_the_viewport_lets_the_page_use_the_safe_areas(client: TestClient) -> No
     html = client.get("/login").text
 
     assert "viewport-fit=cover" in html
+
+
+def test_table_headers_stick_on_desktop_except_in_movimientos(
+    admin_client: TestClient, material: Material
+) -> None:
+    """EARS-H9-06, X-05 — and clip/sticky only live inside the desktop query,
+    so tablets and phones (cards, sideways scroll) are left as they were."""
+    for page in ("/", "/materials", "/users", "/payments?estado=todos"):
+        assert "k-card k-card--sticky-head" in admin_client.get(page).text, page
+    assert "k-card--sticky-head" not in admin_client.get("/movements").text
+
+    css = admin_client.get("/static/css/kardex.css").text
+    desktop = css.index(
+        "@media (min-width:1024px) and (min-height:500px){\n  .k-card--sticky-head"
+    )
+    assert css.count("overflow-x:clip") == 1
+    assert css.index("overflow-x:clip") > desktop
+    assert css.count("thead th{position:sticky") == 1
+    assert css.index("thead th{position:sticky") > desktop
+    compact = css.index(
+        "@media (min-width:1024px) and (min-height:500px) and (pointer:fine){\n"
+        "  .k-pager__compact{display:flex}"
+    )
+    assert css.index(".k-pager__compact{display:none") < compact

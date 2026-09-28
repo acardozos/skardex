@@ -840,8 +840,8 @@ def test_the_catalog_disables_previous_and_next_at_the_ends(
     """EARS-H1-03 (spec 005): the controls now appear once, below the list."""
     _catalog(db_session, 23)
 
-    first = admin_client.get("/materials").text
-    last = admin_client.get("/materials?page=3").text
+    first = _below(admin_client.get("/materials").text)
+    last = _below(admin_client.get("/materials?page=3").text)
 
     assert first.count('aria-disabled="true">Anterior') == 1
     assert first.count('aria-disabled="true">Siguiente') == 0
@@ -1179,3 +1179,8 @@ def test_a_catalog_card_joins_code_unit_minimum_and_price_skipping_blanks(
     )
     assert 'class="k-table k-table--cards k-table--catalog"' in html
     assert "data-label" not in html
+
+
+def _below(html: str) -> str:
+    """The full controls under the list (spec 007 added compact ones above)."""
+    return html[html.index('class="k-pager"') :]

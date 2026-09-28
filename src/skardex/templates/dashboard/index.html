@@ -86,9 +86,9 @@
         </nav>
     </div>
 
-    {{ pager_summary(pg) }}
+    {{ pager_summary(pg, "/", params) }}
 
-    <div class="k-card">
+    <div class="k-card k-card--sticky-head">
         <div class="k-card__head">
             <h2 class="k-card__title">Saldos por artículo</h2>
             <span class="k-card__meta">{{ active_materials_count }} artículo{{ "s" if active_materials_count != 1 else "" }} activo{{ "s" if active_materials_count != 1 else "" }}</span>
