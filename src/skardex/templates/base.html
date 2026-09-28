@@ -80,6 +80,19 @@
 {% endif %}
 {% block content %}{% endblock %}
 <script>
+  // Show/hide buttons of password fields (spec 003, H6): they start hidden
+  // and appear only here, so without JavaScript there is no dead button.
+  document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+    const input = document.getElementById(button.dataset.passwordToggle);
+    if (!input) return;
+    button.hidden = false;
+    button.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      button.setAttribute("aria-pressed", String(show));
+      button.setAttribute("aria-label", show ? "Ocultar contraseña" : "Mostrar contraseña");
+    });
+  });
   const kardexTheme = () => {
     const claro = document.documentElement.dataset.theme === 'light';
     document.documentElement.dataset.theme = claro ? '' : 'light';

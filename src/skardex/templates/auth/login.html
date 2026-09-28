@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_password.html" import password_field %}
 
 {% block title %}Iniciar sesión — Simple Kardex{% endblock %}
 
@@ -25,7 +26,7 @@
                 </div>
                 <div class="k-field">
                     <label class="k-label" for="password">Contraseña</label>
-                    <input class="k-input" type="password" id="password" name="password" required>
+                    {{ password_field("password") }}
                 </div>
                 <button type="submit" class="k-btn k-btn--primary k-btn--block">Ingresar</button>
             </form>
