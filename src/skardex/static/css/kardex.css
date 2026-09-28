@@ -268,8 +268,10 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .k-pager__summary{margin:0}
 .k-pager__summary,.k-pager__pos{font-size:13px;color:var(--muted)}
 .k-pager__nav,.k-pager__size{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-/* Right-aligned even when it is alone (a single page has no nav). */
-.k-pager__size{margin-left:auto}
+/* One rule everywhere, one page or many, any device: "Filas por página"
+   on the left, paging on the right, under the compact paging above. */
+.k-pager__size{order:-1}
+.k-pager__nav{margin-left:auto}
 /* Phones use the default page size; see _pagination.html. Must come after
    the display:flex above, which would otherwise win. */
 @media (max-width:719.98px){.k-pager__size{display:none}}
@@ -478,10 +480,6 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
    controls below. */
 @media (min-width:1024px) and (min-height:500px) and (pointer:fine){
   .k-pager__compact{display:flex}
-  /* With paging both above and below, keep it on the same side: the size
-     selector moves left and the paging goes right, under its twin above. */
-  .k-pager[data-paged] .k-pager__size{order:-1;margin-left:0}
-  .k-pager[data-paged] .k-pager__nav{margin-left:auto}
 }
 /* Column headers stay under the app header while the page scrolls. The card
    must stop being a scroll container for that: overflow-x:auto makes it one

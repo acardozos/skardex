@@ -1930,26 +1930,21 @@ def test_a_single_page_has_no_compact_paging_above(
     assert "Mostrando 1–5 de 5" in html
 
 
-def test_paging_sits_on_the_right_both_above_and_below_on_desktop(
+def test_the_size_selector_is_always_left_and_paging_always_right(
     admin_client: TestClient,
     admin_user: User,
     material: Material,
     db_session: Session,
 ) -> None:
-    """EARS-H9-05 (user's review, 2026-09-27): where paging shows above and
-    below, both sit on the right and "Filas por página" goes left below.
-    Only with more than one page: alone, the selector stays on the right."""
+    """EARS-H9-02 (user's review, 2026-09-28): one rule for every list, with
+    one page or many and on any device, so the selector no longer jumps
+    sides depending on the page count or the pointer."""
     _add_history(db_session, admin_user, material, 23)
-    paged = admin_client.get("/movements").text
-    db_session.query(Movement).delete()
-    db_session.commit()
-    _add_history(db_session, admin_user, material, 5)
-    single = admin_client.get("/movements").text
     css = admin_client.get("/static/css/kardex.css").text
+    html = admin_client.get("/movements").text
 
-    assert '<div class="k-pager" data-paged>' in paged
-    assert '<div class="k-pager">' in single
-    desktop = css[css.index("and (pointer:fine){\n  .k-pager__compact{display:flex}") :]
-    desktop = desktop[: desktop.index("\n}")]
-    assert ".k-pager[data-paged] .k-pager__size{order:-1;margin-left:0}" in desktop
-    assert ".k-pager[data-paged] .k-pager__nav{margin-left:auto}" in desktop
+    # At the start of a line: rules inside an @media block are indented, so
+    # these apply at every width and with any pointer.
+    assert re.search(r"(?m)^\.k-pager__size\{order:-1\}$", css)
+    assert re.search(r"(?m)^\.k-pager__nav\{margin-left:auto\}$", css)
+    assert "data-paged" not in css and "data-paged" not in html

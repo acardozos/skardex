@@ -34,7 +34,7 @@
 
 {% macro pager(pg, base_path, params) %}
 {% if pg.total > 0 %}
-<div class="k-pager"{{ ' data-paged' if pg.pages > 1 else '' }}>
+<div class="k-pager">
     {#- With a single page there is nowhere to go: no Previous/Next at all. -#}
     {% if pg.pages > 1 %}
     <nav class="k-pager__nav" aria-label="Páginas">
