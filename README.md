@@ -1,7 +1,6 @@
 # Simple Kardex
 
-A simple materials/supplies inventory tracker (kardex) for a family
-business — replaces a spreadsheet with an entries/exits ledger,
+A simple inventory tracker (kardex) for a family business — replaces a spreadsheet with an entries/exits ledger,
 calculated balances, and low-stock alerts.
 
 [![CI](https://github.com/acardozos/skardex/actions/workflows/ci.yml/badge.svg)](https://github.com/acardozos/skardex/actions/workflows/ci.yml)
@@ -12,23 +11,27 @@ calculated balances, and low-stock alerts.
 
 ## What it does
 
-- Materials catalog with code, unit of measure, and minimum stock.
+- Item catalog ("Artículos" in the UI; `Material` in the code) with code,
+  unit of measure, and minimum stock.
 - Movement log (entries/exits) with balance calculated from history,
   never stored as a separate column. Every movement carries a reason
   (purchase/return/adjustment/other for entries; sale/internal use/waste/
   scrap/sample/adjustment for exits).
-- Sale price and pending payment: a reference sale price per material, a
+- Sale price and pending payment: a reference sale price per item, a
   Payments screen with the total pending, payment-by-selection, and
   billing correction — a sale is never blocked for lack of a price, it's
   just flagged as unpriced until fixed.
 - Configurable pagination (10/25/50/100 rows) across every list.
-- Dashboard with counters and a visual alert for materials below their
+- Dashboard with counters and a visual alert for items below their
   minimum stock, plus unpriced sales.
-- Two roles: **admin** (owner, manages materials, users, and prices) and
+- Two roles: **admin** (owner, manages items, users, and prices) and
   **operario** (registers movements and reads the catalog only).
 - No public sign-up — the admin creates accounts; users can change their
   own password, and the admin can reset one to a temporary password that
   forces a change at next login.
+- Works on phones, tablets and desktop: lists turn into compact cards on
+  narrow and touch screens, touch targets are at least 44px, and state
+  colors (fine, needs attention, error) meet WCAG AA in both themes.
 - Switchable dark/light theme.
 
 ## Stack
