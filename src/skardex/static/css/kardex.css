@@ -176,8 +176,8 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 
 /* ---------- Tablas ---------- */
 .k-table{width:100%;border-collapse:collapse}
-.k-table th{padding:12px 20px;background:var(--bg);border-bottom:1px solid var(--border);text-align:left;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
-.k-table td{padding:14px 20px;border-bottom:1px solid var(--border);font-size:15px;vertical-align:middle}
+.k-table th{padding:12px 12px;background:var(--bg);border-bottom:1px solid var(--border);text-align:left;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted)}
+.k-table td{padding:14px 12px;border-bottom:1px solid var(--border);font-size:15px;vertical-align:middle}
 .k-table tr:last-child td{border-bottom:none}
 .k-table .k-num{text-align:right;font-variant-numeric:tabular-nums}
 /* Quantities, amounts, tags and buttons never split across two lines. */
@@ -226,13 +226,29 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
   .k-table--users tr{grid-template-columns:1fr auto auto;grid-template-areas:"name role state" "actions actions actions"}
   .k-table--unpriced tr{grid-template-areas:"name qty" "date date" "note note" "actions actions"}
 }
+/* Artículos (7 columns with its actions) does not fit as a table below
+   ~800px (measured on captures, task 9), so its card starts earlier: the
+   same card as above, repeated for this one table. */
+@media (max-width:799.98px){
+  .k-table--catalog thead{display:none}
+  .k-table--catalog tr{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);grid-template-areas:"name state" "meta meta" "actions actions"}
+  .k-table--catalog tr:last-child{border-bottom:none}
+  .k-table--catalog td{display:block;padding:0;border:none;text-align:left}
+  .k-table--catalog .k-only-table{display:none}
+  .k-table--catalog .k-only-card{display:block}
+  .k-table--catalog .k-actions{justify-content:flex-start}
+  .k-table--catalog .k-c-name{grid-area:name}
+  .k-table--catalog .k-c-state{grid-area:state;justify-self:end}
+  .k-table--catalog .k-c-meta{grid-area:meta;color:var(--muted);font-size:14px}
+  .k-table--catalog .k-c-actions{grid-area:actions}
+}
 
 /* ---------- Focus and touch targets (spec 007, H5) ---------- */
 /* A visible outline for keyboard focus on everything that can take it. */
 a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 /* Fingers need 44x44px; with a mouse the smaller controls stay as they are. */
 @media (pointer:coarse){
-  .k-seg a{display:inline-flex;align-items:center;min-height:44px}
+  .k-seg a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
   .k-btn--sm{min-height:44px;min-width:44px}
   .k-btn--icon{width:44px;height:44px}
 }
@@ -428,7 +444,9 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .k-paybar .k-dim{color:var(--muted);font-size:13px}
 #selected-total{white-space:nowrap}
 .k-paybar__all{display:none;font-size:14px}
-@media (max-width:719.98px){
+/* Below 1024px, not 720: with 8-9 columns Pagos does not fit as a table on
+   a tablet (measured on captures, task 9). The bar follows the cards. */
+@media (max-width:1023.98px){
   .k-table--sales{display:none}
   .k-pcards{display:block}
   /* Always in view while the sales scroll; clear of the phone's gesture bar. */
@@ -476,4 +494,19 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 @media (min-width:1024px) and (min-height:500px){
   .k-card--sticky-head{overflow-x:clip}
   .k-card--sticky-head .k-table thead th{position:sticky;top:56px;z-index:2;box-shadow:inset 0 -1px 0 var(--border)}
+}
+
+
+/* ---------- Phones: more list, less heading (spec 007, H2-12) ---------- */
+/* Below 720px a list page spent ~436px before its first row. The page's
+   one-line description goes (the title says what the page is), the title
+   shrinks so the main button fits beside it, and cards get a little less
+   padding. */
+@media (max-width:719.98px){
+  .k-main{padding-top:18px;gap:16px}
+  .k-page-head{align-items:center;gap:12px}
+  .k-page-head > div > p:not(.k-eyebrow){display:none}
+  .k-page-head h1{margin:2px 0 0;font-size:24px}
+  .k-page-head .k-btn{padding:10px 14px}
+  .k-mcard,.k-pcard{padding:12px 14px;gap:4px}
 }

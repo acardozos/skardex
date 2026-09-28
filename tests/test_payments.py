@@ -1004,7 +1004,7 @@ def test_select_all_exists_at_every_width_in_one_place_at_a_time(
     assert 'id="select-all-bar" data-select-all' in html
     assert html.index('class="k-paybar"') < html.index('id="select-all-bar"')
     assert ".k-paybar__all{display:none" in css
-    narrow = css[css.index("@media (max-width:719.98px){\n  .k-table--sales") :]
+    narrow = css[css.index("@media (max-width:1023.98px){\n  .k-table--sales") :]
     narrow = narrow[: narrow.index("\n}")]
     for rule in (
         ".k-table--sales{display:none}",
@@ -1078,7 +1078,7 @@ def test_the_fixed_bar_keeps_its_middle_block_to_two_lines(
     count wrapped to four lines. Below 720px the caption is kept for screen
     readers only, the total never wraps and the count goes underneath."""
     css = admin_client.get("/static/css/kardex.css").text
-    narrow = css[css.index("@media (max-width:719.98px){\n  .k-table--sales") :]
+    narrow = css[css.index("@media (max-width:1023.98px){\n  .k-table--sales") :]
     narrow = narrow[: narrow.index("\n}")]
 
     assert "#selected-total{white-space:nowrap}" in css
