@@ -86,7 +86,7 @@
                     {% endif %}
                     <td class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td class="k-strong">{{ sale.material.name }}</td>
-                    <td class="k-num">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
+                    <td class="k-num">{{ sale.quantity | qty }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
                     <td class="k-num">{{ sale.unit_price | cop }}</td>
                     <td class="k-num k-strong">{{ sale.amount | cop }}</td>
                     {% if estado != "pendientes" %}
@@ -121,7 +121,7 @@
                 <p class="k-pcard__meta k-meta">
                     <span>{{ sale.movement_date.strftime('%d/%m/%Y') }}</span>
                     {#- -#}
-                    <span>{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }} × {{ sale.unit_price | cop }}</span>
+                    <span>{{ sale.quantity | qty }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }} × {{ sale.unit_price | cop }}</span>
                     {%- if estado != "pendientes" -%}
                     <span>{% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> {{ sale.paid_at.strftime('%d/%m/%Y') }}{% else %}<span class="k-tag">Pendiente</span>{% endif %}</span>
                     {%- endif -%}
@@ -192,7 +192,7 @@
                 <tr>
                     <td class="k-dim k-c-date">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td class="k-strong k-c-name">{{ sale.material.name }}</td>
-                    <td class="k-num k-c-qty">{{ sale.quantity }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
+                    <td class="k-num k-c-qty">{{ sale.quantity | qty }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
                     <td class="k-dim k-c-note{{ '' if sale.note else ' is-empty' }}">{{ sale.note or "-" }}</td>
                     {% if user.role == "admin" %}
                     <td class="k-c-actions"><a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a></td>

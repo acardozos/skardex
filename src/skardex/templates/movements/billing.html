@@ -18,7 +18,7 @@
             <div class="k-facts">
                 <span class="k-label">Fecha</span><span>{{ movement.movement_date.strftime('%d/%m/%Y') }}</span>
                 <span class="k-label">Artículo</span><span class="k-strong">{{ movement.material.name }}</span>
-                <span class="k-label">Cantidad</span><span>{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
+                <span class="k-label">Cantidad</span><span>{{ movement.quantity | qty }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
                 <span class="k-label">Registrada por</span><span>{{ movement.user.username }}</span>
                 <span class="k-label">Estado</span>
                 <span id="billing-state">

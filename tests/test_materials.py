@@ -1171,8 +1171,7 @@ def test_a_catalog_card_joins_code_unit_minimum_and_price_skipping_blanks(
     html = admin_client.get("/materials").text
 
     assert _catalog_card_line(html, "Cemento") == (
-        "<span>CEM-1</span><span>kg</span><span>mín. 5.000</span>"
-        "<span>$ 1.200,00</span>"
+        "<span>CEM-1</span><span>kg</span><span>mín. 5</span><span>$ 1.200,00</span>"
     )
     assert _catalog_card_line(html, "Arena") == (
         '<span>kg</span><span><span class="k-tag k-tag--warn">Sin precio</span></span>'

@@ -25,7 +25,7 @@
                     <option value="" disabled {% if not form.get("material_id") %}selected{% endif %}>Selecciona un artículo</option>
                     {% for material in materials %}
                     {% set ref = material.sale_price if (material.sale_price is not none and material.sale_price > 0) else none %}
-                    <option value="{{ material.id }}" data-price="{{ ref if ref is not none else '' }}" data-price-label="{{ (ref | cop) if ref is not none else '' }}" data-unit="{{ unit_labels.get(material.unit, material.unit) }}" {% if form.get("material_id") == material.id | string %}selected{% endif %}>{{ material.name }} · saldo {{ balances.get(material.id, 0) }} {{ unit_labels.get(material.unit, material.unit) }}</option>
+                    <option value="{{ material.id }}" data-price="{{ ref if ref is not none else '' }}" data-price-label="{{ (ref | cop) if ref is not none else '' }}" data-unit="{{ unit_labels.get(material.unit, material.unit) }}" {% if form.get("material_id") == material.id | string %}selected{% endif %}>{{ material.name }} · saldo {{ balances.get(material.id, 0) | qty }} {{ unit_labels.get(material.unit, material.unit) }}</option>
                     {% endfor %}
                 </select>
             </div>

@@ -125,7 +125,7 @@
                     <td class="k-dim">{{ movement.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td class="k-strong">{{ movement.material.name }}</td>
                     <td><span class="k-tag {{ 'k-tag--ok' if movement.type == 'entrada' else 'k-tag--neutral' }}">{{ "Entrada" if movement.type == "entrada" else "Salida" }}</span></td>
-                    <td class="k-num">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</td>
+                    <td class="k-num">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity | qty }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</td>
                     <td class="k-dim">
                         {%- if movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
                         {%- else -%}Sin motivo{%- endif -%}
@@ -165,7 +165,7 @@
             <li class="k-mcard">
                 <div class="k-mcard__main">
                     <span class="k-strong">{{ movement.material.name }}</span>
-                    <span class="k-num k-mcard__qty {{ qty_class }}">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
+                    <span class="k-num k-mcard__qty {{ qty_class }}">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity | qty }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}</span>
                 </div>
                 <p class="k-mcard__meta k-meta">
                     <span>{{ movement.movement_date.strftime('%d/%m/%Y') }}</span>

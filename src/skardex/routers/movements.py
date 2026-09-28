@@ -26,6 +26,7 @@ from skardex.pagination import (
     resolve_per_page,
     safe_return_url,
 )
+from skardex.quantities import format_quantity
 from skardex.security import CurrentUser, require_admin
 from skardex.services.billing_service import (
     InvalidPriceError,
@@ -51,7 +52,7 @@ router = APIRouter(prefix="/movements")
 
 def _error_message(exc: Exception) -> str:
     if isinstance(exc, InsufficientStockError):
-        return f"Saldo insuficiente (disponible: {exc.available})."
+        return f"Saldo insuficiente (disponible: {format_quantity(exc.available)})."
     if isinstance(exc, InvalidQuantityError):
         return "La cantidad debe ser un número mayor a cero."
     if isinstance(exc, InactiveMaterialError):

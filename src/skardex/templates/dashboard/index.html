@@ -53,7 +53,7 @@
             </div>
             <div class="k-chips">
                 {% for item in items if item.is_low %}
-                <div class="k-chip">{{ item.material.name }} <span>{{ item.balance }} de {{ item.material.min_stock }} {{ unit_labels.get(item.material.unit, item.material.unit) }}</span></div>
+                <div class="k-chip">{{ item.material.name }} <span>{{ item.balance | qty }} de {{ item.material.min_stock | qty }} {{ unit_labels.get(item.material.unit, item.material.unit) }}</span></div>
                 {% endfor %}
             </div>
             <a class="k-btn k-btn--ghost k-btn--sm" id="low-stock-link" href="{{ page_url('/', {}, bajo_minimo='1') }}">Ver en la tabla de saldos</a>
@@ -109,12 +109,12 @@
                     {% set unit = unit_labels.get(item.material.unit, item.material.unit) %}
                     <td class="k-strong k-c-name">{{ item.material.name }}</td>
                     <td class="k-dim k-only-table">{{ unit }}</td>
-                    <td class="k-num k-only-table{{ ' k-low' if item.is_low else '' }}">{{ item.balance }}</td>
-                    <td class="k-num k-dim k-only-table">{{ item.material.min_stock if item.material.min_stock is not none else "-" }}</td>
+                    <td class="k-num k-only-table{{ ' k-low' if item.is_low else '' }}">{{ item.balance | qty }}</td>
+                    <td class="k-num k-dim k-only-table">{{ item.material.min_stock | qty if item.material.min_stock is not none else "-" }}</td>
                     <td class="k-num k-c-state"><span class="k-tag {{ 'k-tag--warn' if item.is_low else 'k-tag--ok' }}">{{ "Bajo mínimo" if item.is_low else "En orden" }}</span></td>
                     <td class="k-only-card k-c-meta k-meta">
-                        <span class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance }} {{ unit }}</span>
-                        {%- if item.material.min_stock is not none %}<span>mín. {{ item.material.min_stock }}</span>{% endif -%}
+                        <span class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance | qty }} {{ unit }}</span>
+                        {%- if item.material.min_stock is not none %}<span>mín. {{ item.material.min_stock | qty }}</span>{% endif -%}
                     </td>
                 </tr>
                 {% endfor %}

@@ -73,13 +73,13 @@
                     <td class="k-dim k-only-table">{{ material.code or "-" }}</td>
                     <td class="k-strong k-c-name">{{ material.name }}</td>
                     <td class="k-dim k-only-table">{{ unit }}</td>
-                    <td class="k-num k-only-table">{{ material.min_stock if material.min_stock is not none else "-" }}</td>
+                    <td class="k-num k-only-table">{{ material.min_stock | qty if material.min_stock is not none else "-" }}</td>
                     <td class="k-num k-only-table">{{ price }}</td>
                     <td class="k-c-state"><span class="k-tag{{ ' k-tag--ok' if material.is_active else ' k-tag--neutral' }}">{{ "Activo" if material.is_active else "Inactivo" }}</span></td>
                     <td class="k-only-card k-c-meta k-meta">
                         {%- if material.code %}<span>{{ material.code }}</span>{% endif -%}
                         <span>{{ unit }}</span>
-                        {%- if material.min_stock is not none %}<span>mín. {{ material.min_stock }}</span>{% endif -%}
+                        {%- if material.min_stock is not none %}<span>mín. {{ material.min_stock | qty }}</span>{% endif -%}
                         <span>{{ price }}</span>
                     </td>
                     {% if user.role == "admin" %}

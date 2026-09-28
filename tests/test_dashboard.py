@@ -643,7 +643,7 @@ def test_a_materials_balance_is_the_same_on_any_page_or_filter(
         )
     }
 
-    assert set(seen.values()) == {"3.500"}, seen
+    assert set(seen.values()) == {"3,5"}, seen  # 3.5 units (spec 004 H3-07)
 
 
 def test_the_dashboard_does_not_echo_unknown_parameters(
@@ -693,9 +693,9 @@ def test_a_balance_card_shows_the_balance_and_the_minimum_without_labels(
     html = admin_client.get("/").text
 
     assert _card_line(html, "Cemento") == (
-        '<span class="k-num k-low">4.000 kg</span><span>mín. 10.000</span>'
+        '<span class="k-num k-low">4 kg</span><span>mín. 10</span>'
     )
-    assert _card_line(html, "Arena") == '<span class="k-num">0.000 kg</span>'
+    assert _card_line(html, "Arena") == '<span class="k-num">0 kg</span>'
     assert 'class="k-table k-table--cards k-table--balances"' in html
 
 

@@ -1693,7 +1693,7 @@ def test_a_card_shows_item_quantity_date_reason_and_user(
     card = _card(admin_client.get("/movements").text, "Arena")
 
     assert '<span class="k-strong">Arena</span>' in card
-    assert 'class="k-num k-mcard__qty k-mcard__qty--in">+2.500 kg</span>' in card
+    assert 'class="k-num k-mcard__qty k-mcard__qty--in">+2,5 kg</span>' in card
     assert "<span>10/09/2026</span><span>Compra</span><span>admin</span>" in card
     assert "data-label" not in card
 

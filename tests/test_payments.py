@@ -969,7 +969,7 @@ def test_a_sale_card_shows_item_amount_date_and_quantity_times_price(
 
     assert '<span class="k-strong">Ladrillo</span>' in card
     assert '<span class="k-num k-strong k-pcard__amount">$ 3.000,00</span>' in card
-    assert "<span>10/09/2026</span><span>3.000 kg × $ 1.000,00</span>" in card
+    assert "<span>10/09/2026</span><span>3 kg × $ 1.000,00</span>" in card
     assert '<p class="k-pcard__note">obra</p>' in card
     assert "Corregir cobro" in card
 
