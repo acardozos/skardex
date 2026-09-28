@@ -14,7 +14,10 @@
         <p class="k-banner k-banner--danger">{{ error }}</p>
         {% endif %}
 
-        {% set chosen_type = form.get("movement_type", "entrada") %}
+        {#- The operario mostly registers sales, so the form opens on Salida
+            for them (and so on "Venta"); the admin opens on Entrada. A type
+            sent back after an error always wins over the default. -#}
+        {% set chosen_type = form.get("movement_type", "entrada" if is_admin else "salida") %}
         <form class="k-form" method="post" action="/movements/new">
             <div class="k-field">
                 <label class="k-label" for="material_id">Artículo</label>

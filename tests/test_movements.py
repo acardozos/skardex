@@ -1948,3 +1948,50 @@ def test_the_size_selector_is_always_left_and_paging_always_right(
     assert re.search(r"(?m)^\.k-pager__size\{order:-1\}$", css)
     assert re.search(r"(?m)^\.k-pager__nav\{margin-left:auto\}$", css)
     assert "data-paged" not in css and "data-paged" not in html
+
+
+# --- Spec 006, addition H3-05 (backlog P13): Salida by default for operario --
+
+
+def _checked_type(html: str) -> str:
+    """The movement type the form opens with."""
+    match = re.search(
+        r'<input type="radio" name="movement_type" value="(\w+)" checked>', html
+    )
+    assert match is not None, "no movement type is checked"
+    return match.group(1)
+
+
+def test_the_operario_opens_the_form_on_salida_with_venta_ready(
+    operario_client: TestClient,
+) -> None:
+    """EARS-H3-05 (spec 006) — a sale, their usual case, needs no extra tap."""
+    html = operario_client.get("/movements/new").text
+
+    assert _checked_type(html) == "salida"
+    assert '<option value="venta" selected>' in _salida_select(html)
+
+
+def test_the_admin_still_opens_the_form_on_entrada(admin_client: TestClient) -> None:
+    """EARS-H3-05 (spec 006)"""
+    assert _checked_type(admin_client.get("/movements/new").text) == "entrada"
+
+
+def test_a_rejected_form_keeps_the_type_the_operario_chose(
+    operario_client: TestClient, material: Material
+) -> None:
+    """EARS-H3-05 (spec 006) — the default never overrides what was sent."""
+    response = operario_client.post(
+        "/movements/new",
+        data={
+            "material_id": str(material.id),
+            "movement_type": "entrada",
+            "reason": "compra",
+            "quantity": "0",  # invalid on purpose, to force a 400 redisplay
+            "movement_date": "2026-01-15",
+            "note": "",
+        },
+    )
+
+    assert response.status_code == 400
+    assert _checked_type(response.text) == "entrada"
