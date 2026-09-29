@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from skardex.models import Material
 
 COMPLETE = {
-    "alt_unit_name": "Rollo",
+    "alt_unit_name": "rollo",
     "alt_unit_factor": Decimal("30"),
     "alt_unit_reading": Decimal("12"),
     "alt_unit_read_at": datetime(2026, 9, 29, 15, 0, tzinfo=UTC),

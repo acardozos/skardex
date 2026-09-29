@@ -1183,3 +1183,336 @@ def test_a_catalog_card_joins_code_unit_minimum_and_price_skipping_blanks(
 def _below(html: str) -> str:
     """The full controls under the list (spec 007 added compact ones above)."""
     return html[html.index('class="k-pager"') :]
+
+
+# --- Alternate unit and recalibration in the form (spec 008) ---
+
+ROLL = {"alt_unit_name": "rollo", "alt_unit_factor": "30"}
+ALT_UNIT_FIELDS = (
+    'id="alt_unit_name" name="alt_unit_name"',
+    'id="alt_unit_factor" name="alt_unit_factor"',
+    'id="alt_unit_reading" name="alt_unit_reading"',
+)
+
+
+def _field_value(page: str, name: str) -> str:
+    """The value of an input, or the selected option of a <select>."""
+    select = re.search(rf'<select[^>]*name="{name}"[^>]*>(.*?)</select>', page, re.S)
+    if select is not None:
+        match = re.search(r'<option value="([^"]*)" selected>', select.group(1))
+    else:
+        match = re.search(rf'name="{name}"[^>]*value="([^"]*)"', page)
+    assert match is not None, name
+    return html_lib.unescape(match.group(1))
+
+
+def _roll_material(
+    admin_client: TestClient, db_session: Session, reading: str = "12"
+) -> Material:
+    admin_client.post(
+        "/materials/new",
+        data=_material_data(name="Papel polarizado", unit="m", **ROLL)
+        | {"alt_unit_reading": reading},
+    )
+    return db_session.query(Material).filter_by(name="Papel polarizado").one()
+
+
+def _add_movement(
+    db_session: Session,
+    material: Material,
+    user: User,
+    movement_type: str,
+    quantity: str,
+    reason: str,
+) -> None:
+    db_session.add(
+        Movement(
+            material_id=material.id,
+            user_id=user.id,
+            type=movement_type,
+            quantity=Decimal(quantity),
+            reason=reason,
+        )
+    )
+    db_session.commit()
+
+
+def _resubmit(admin_client: TestClient, material: Material, **changes: str) -> Response:
+    """Send the edit form back as it was loaded, with `changes` typed in."""
+    page = admin_client.get(f"/materials/{material.id}/edit").text
+    fields = (
+        "code",
+        "name",
+        "unit",
+        "min_stock",
+        "sale_price",
+        "alt_unit_name",
+        "alt_unit_factor",
+        "alt_unit_reading",
+        "alt_unit_reading_shown",
+        "alt_unit_shown_review",
+    )
+    data = {
+        field: (material.unit if field == "unit" else _field_value(page, field))
+        for field in fields
+    }
+    return admin_client.post(
+        f"/materials/{material.id}/edit",
+        data=data | changes,
+        follow_redirects=False,
+    )
+
+
+def test_both_forms_offer_the_alternate_unit_fields(
+    admin_client: TestClient, material: Material
+) -> None:
+    """EARS-H1-01 (spec 008)"""
+    for url in ("/materials/new", f"/materials/{material.id}/edit"):
+        page = admin_client.get(url).text
+        assert "Unidad alterna (opcional)" in page
+        assert "Consumido actual del contenedor abierto" in page
+        for field in ALT_UNIT_FIELDS:
+            assert field in page, (url, field)
+        # The unit is picked from the fixed list, like the unit of measure.
+        assert _field_value(page, "alt_unit_name") == ""
+        assert '<option value="" selected>Sin unidad alterna</option>' in page
+        assert '<option value="rollo" >rollo</option>' in page
+
+
+@pytest.mark.parametrize(
+    ("alt_unit", "message"),
+    [
+        (
+            {"alt_unit_name": "rollo"},
+            "Indica el nombre y el factor de la unidad alterna, o deja los dos vacíos.",
+        ),
+        (
+            {"alt_unit_factor": "30"},
+            "Indica el nombre y el factor de la unidad alterna, o deja los dos vacíos.",
+        ),
+        (
+            {"alt_unit_name": "tubo", "alt_unit_factor": "30"},
+            "La unidad alterna no es válida.",
+        ),
+        *(
+            (
+                {"alt_unit_name": "rollo", "alt_unit_factor": factor},
+                "El factor debe ser un número mayor a cero, con hasta 3 decimales.",
+            )
+            for factor in ("0", "-30", "30.0005", "abc")
+        ),
+        *(
+            (
+                ROLL | {"alt_unit_reading": reading},
+                "El consumido actual debe ser un número de 0 hasta menos que"
+                " el factor, con hasta 3 decimales.",
+            )
+            for reading in ("-1", "30", "12.0005", "abc")
+        ),
+    ],
+)
+def test_an_invalid_alternate_unit_is_rejected_and_nothing_is_saved(
+    admin_client: TestClient,
+    db_session: Session,
+    alt_unit: dict[str, str],
+    message: str,
+) -> None:
+    """EARS-H1-02, H1-03, H1-04 (spec 008)"""
+    response = admin_client.post("/materials/new", data=_material_data(**alt_unit))
+
+    assert response.status_code == 400
+    assert html_lib.escape(message, quote=False) in response.text
+    assert db_session.query(Material).count() == 0
+
+
+def test_the_first_reading_is_saved_and_empty_means_zero(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-05 (spec 008)"""
+    response = admin_client.post(
+        "/materials/new",
+        data=_material_data(name="Papel", unit="m", **ROLL),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    material = db_session.query(Material).one()
+    assert (material.alt_unit_name, material.alt_unit_factor) == (
+        "rollo",
+        Decimal("30"),
+    )
+    assert material.alt_unit_reading == Decimal("0")
+    assert material.alt_unit_read_at is not None
+
+
+def test_clearing_name_and_factor_removes_it_and_ignores_the_reading(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-06 (spec 008)"""
+    roll = _roll_material(admin_client, db_session)
+
+    response = _resubmit(
+        admin_client, roll, alt_unit_name="", alt_unit_factor="", alt_unit_reading="7"
+    )
+
+    assert response.status_code == 303
+    db_session.refresh(roll)
+    assert roll.alt_unit_name is None
+    assert roll.alt_unit_reading is None
+
+
+def test_a_rejected_new_material_shows_everything_that_was_typed(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H1-07 (spec 008)"""
+    typed = _material_data(
+        code="POL-1",
+        name="Papel polarizado",
+        unit="m",
+        min_stock="15",
+        sale_price="8000",
+        alt_unit_name="rollo",
+        alt_unit_factor="30",
+        alt_unit_reading="45",  # the error
+    )
+
+    page = admin_client.post("/materials/new", data=typed).text
+
+    for field in ("code", "name", "min_stock", "sale_price", "alt_unit_name"):
+        assert _field_value(page, field) == typed[field], field
+    assert _field_value(page, "alt_unit_factor") == "30"
+    assert _field_value(page, "alt_unit_reading") == "45"
+    assert '<option value="m" selected>' in page
+
+
+def test_a_rejected_edit_shows_what_was_typed_not_what_is_saved(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H1-07 (spec 008)"""
+    roll = _roll_material(admin_client, db_session)
+
+    response = _resubmit(
+        admin_client,
+        roll,
+        name="Papel nano cerámica",
+        alt_unit_factor="50",
+        alt_unit_reading="-3",
+    )
+
+    assert response.status_code == 400
+    assert _field_value(response.text, "name") == "Papel nano cerámica"
+    assert _field_value(response.text, "alt_unit_factor") == "50"
+    assert _field_value(response.text, "alt_unit_reading") == "-3"
+    # The hidden value shown keeps the one of the original page.
+    assert _field_value(response.text, "alt_unit_reading_shown") == "12.000"
+    db_session.refresh(roll)
+    assert roll.name == "Papel polarizado"
+
+
+def test_the_edit_form_shows_the_consumido_computed_now(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H3-01 (spec 008)"""
+    roll = _roll_material(admin_client, db_session, reading="12")
+    _add_movement(db_session, roll, admin_user, "entrada", "90", "compra")
+    _add_movement(db_session, roll, admin_user, "salida", "5.5", "venta")
+
+    page = admin_client.get(f"/materials/{roll.id}/edit").text
+
+    assert _field_value(page, "alt_unit_reading") == "17.500"
+    assert _field_value(page, "alt_unit_reading_shown") == "17.500"
+    assert _field_value(page, "alt_unit_shown_review") == ""
+    assert "Lo que marca el tirro." in page
+
+
+def test_the_edit_form_of_a_material_in_review_shows_zero_and_says_so(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H3-01 (spec 008)"""
+    roll = _roll_material(admin_client, db_session, reading="2")
+    _add_movement(db_session, roll, admin_user, "entrada", "5", "ajuste")
+
+    page = admin_client.get(f"/materials/{roll.id}/edit").text
+
+    assert _field_value(page, "alt_unit_reading") == "0"
+    assert _field_value(page, "alt_unit_shown_review") == "1"
+    assert "Revisar: hay más entradas de Ajuste que salidas." in page
+
+
+def test_a_salida_while_the_form_is_open_does_not_recalibrate(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H3-04 (spec 008)"""
+    roll = _roll_material(admin_client, db_session)  # 12
+    _add_movement(db_session, roll, admin_user, "entrada", "90", "compra")
+    page = admin_client.get(f"/materials/{roll.id}/edit").text  # shows 12
+    mark = roll.alt_unit_read_after_id
+    _add_movement(db_session, roll, admin_user, "salida", "5", "venta")  # 17
+
+    data = {
+        field: _field_value(page, field)
+        for field in (
+            "code",
+            "name",
+            "min_stock",
+            "sale_price",
+            "alt_unit_name",
+            "alt_unit_factor",
+            "alt_unit_reading",
+            "alt_unit_reading_shown",
+            "alt_unit_shown_review",
+        )
+    }
+    admin_client.post(f"/materials/{roll.id}/edit", data=data | {"unit": "m"})
+
+    db_session.refresh(roll)
+    assert roll.alt_unit_read_after_id == mark
+    edit = admin_client.get(f"/materials/{roll.id}/edit").text
+    assert _field_value(edit, "alt_unit_reading") == "17.000"
+
+
+def test_typing_a_new_reading_recalibrates(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H3-02 (spec 008)"""
+    roll = _roll_material(admin_client, db_session)
+    _add_movement(db_session, roll, admin_user, "entrada", "90", "compra")
+    _add_movement(db_session, roll, admin_user, "salida", "5", "venta")  # 17
+
+    _resubmit(admin_client, roll, alt_unit_reading="20")
+
+    db_session.refresh(roll)
+    assert roll.alt_unit_reading == Decimal("20")
+    edit = admin_client.get(f"/materials/{roll.id}/edit").text
+    assert _field_value(edit, "alt_unit_reading") == "20.000"
+
+
+def test_a_new_factor_recalibrates_with_the_reading_in_the_field(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H3-03 (spec 008)"""
+    roll = _roll_material(admin_client, db_session)
+    _add_movement(db_session, roll, admin_user, "entrada", "90", "compra")
+    _add_movement(db_session, roll, admin_user, "salida", "5", "venta")  # 17
+    mark = roll.alt_unit_read_after_id
+
+    _resubmit(admin_client, roll, alt_unit_factor="50")
+
+    db_session.refresh(roll)
+    assert roll.alt_unit_factor == Decimal("50")
+    assert roll.alt_unit_reading == Decimal("17")
+    assert roll.alt_unit_read_after_id != mark
+
+
+def test_saving_a_material_in_review_recalibrates_even_to_zero(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H3-05 (spec 008)"""
+    roll = _roll_material(admin_client, db_session, reading="2")
+    _add_movement(db_session, roll, admin_user, "entrada", "5", "ajuste")
+
+    _resubmit(admin_client, roll)  # leaves the 0 it showed
+
+    page = admin_client.get(f"/materials/{roll.id}/edit").text
+    assert _field_value(page, "alt_unit_shown_review") == ""
+    assert _field_value(page, "alt_unit_reading") == "0.000"

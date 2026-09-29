@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
@@ -16,10 +17,16 @@ from skardex.pagination import (
     remember_per_page,
     resolve_per_page,
 )
+from skardex.quantities import InvalidMeasureError, parse_measure
 from skardex.security import CurrentUser, require_admin
 from skardex.services.billing_service import count_unpriced_sales_for_material
+from skardex.services.kardex_service import get_consumed
 from skardex.services.material_service import (
     DuplicateMaterialCodeError,
+    IncompleteAltUnitError,
+    InvalidAltUnitFactorError,
+    InvalidAltUnitNameError,
+    InvalidAltUnitReadingError,
     InvalidMinStockError,
     InvalidSalePriceError,
     InvalidUnitError,
@@ -49,6 +56,19 @@ def _error_message(exc: Exception) -> str:
         return "La unidad de medida no es válida."
     if isinstance(exc, InvalidSalePriceError | InvalidMoneyError):
         return "El precio de venta debe ser un número mayor a cero."
+    if isinstance(exc, IncompleteAltUnitError):
+        return (
+            "Indica el nombre y el factor de la unidad alterna, o deja los dos vacíos."
+        )
+    if isinstance(exc, InvalidAltUnitNameError):
+        return "La unidad alterna no es válida."
+    if isinstance(exc, InvalidAltUnitFactorError):
+        return "El factor debe ser un número mayor a cero, con hasta 3 decimales."
+    if isinstance(exc, InvalidAltUnitReadingError):
+        return (
+            "El consumido actual debe ser un número de 0 hasta menos que el factor,"
+            " con hasta 3 decimales."
+        )
     return "El stock mínimo debe ser un número mayor o igual a cero."
 
 
@@ -67,6 +87,10 @@ _SAVE_ERRORS = (
     InvalidSalePriceError,
     InvalidMoneyError,
     InvalidOperation,
+    IncompleteAltUnitError,
+    InvalidAltUnitNameError,
+    InvalidAltUnitFactorError,
+    InvalidAltUnitReadingError,
 )
 
 
@@ -129,16 +153,129 @@ def list_materials(
     return response
 
 
-@router.get("/new")
-def new_material_form(
+@dataclass
+class MaterialForm:
+    """What the material form sent, as typed, to save it or show it again."""
+
+    code: str
+    name: str
+    unit: str
+    min_stock: str
+    sale_price: str
+    alt_unit_name: str
+    alt_unit_factor: str
+    alt_unit_reading: str
+    # The Consumido the edit form displayed (spec 008, EARS-H3-02..05).
+    alt_unit_reading_shown: str
+    alt_unit_shown_review: str
+
+
+def _material_form(
+    code: str = Form(""),
+    name: str = Form(...),
+    unit: str = Form(...),
+    min_stock: str = Form(""),
+    sale_price: str = Form(""),
+    alt_unit_name: str = Form(""),
+    alt_unit_factor: str = Form(""),
+    alt_unit_reading: str = Form(""),
+    alt_unit_reading_shown: str = Form(""),
+    alt_unit_shown_review: str = Form(""),
+) -> MaterialForm:
+    return MaterialForm(
+        code=code,
+        name=name,
+        unit=unit,
+        min_stock=min_stock,
+        sale_price=sale_price,
+        alt_unit_name=alt_unit_name,
+        alt_unit_factor=alt_unit_factor,
+        alt_unit_reading=alt_unit_reading,
+        alt_unit_reading_shown=alt_unit_reading_shown,
+        alt_unit_shown_review=alt_unit_shown_review,
+    )
+
+
+def _form_from_material(material: Material | None, db: Session) -> MaterialForm:
+    """The form's starting values: empty for a new material, else what is saved.
+
+    The reading field shows the Consumido computed right now (EARS-H3-01),
+    not the last reading, and it is also sent back hidden as the one shown.
+    """
+    if material is None:
+        return MaterialForm(*[""] * 10)
+
+    def text(value: object) -> str:
+        return "" if value is None else str(value)
+
+    consumed = get_consumed(db, material)
+    shown = text(consumed.consumed) if consumed else ""
+    return MaterialForm(
+        code=text(material.code),
+        name=material.name,
+        unit=material.unit,
+        min_stock=text(material.min_stock),
+        sale_price=text(material.sale_price),
+        alt_unit_name=text(material.alt_unit_name),
+        alt_unit_factor=text(material.alt_unit_factor),
+        alt_unit_reading=shown,
+        alt_unit_reading_shown=shown,
+        alt_unit_shown_review="1" if consumed and consumed.needs_review else "",
+    )
+
+
+def _save_form(db: Session, material: Material | None, form: MaterialForm) -> None:
+    """Parse the typed values and save; raises one of `_SAVE_ERRORS`."""
+    try:
+        factor = parse_measure(form.alt_unit_factor, allow_zero=False)
+    except InvalidMeasureError:
+        raise InvalidAltUnitFactorError(form.alt_unit_factor) from None
+    try:
+        reading = parse_measure(form.alt_unit_reading, allow_zero=True)
+    except InvalidMeasureError:
+        raise InvalidAltUnitReadingError(form.alt_unit_reading) from None
+    try:
+        shown = parse_measure(form.alt_unit_reading_shown, allow_zero=True)
+    except InvalidMeasureError:
+        shown = None  # unknown: treated as changed, so the typed reading wins
+
+    save_material(
+        db,
+        material=material,
+        name=form.name,
+        unit=form.unit,
+        code=form.code or None,
+        min_stock=_parse_min_stock(form.min_stock),
+        sale_price=parse_money(form.sale_price),
+        alt_unit_name=form.alt_unit_name,
+        alt_unit_factor=factor,
+        alt_unit_reading=reading,
+        reading_shown=shown,
+        shown_needs_review=form.alt_unit_shown_review == "1",
+    )
+
+
+def _form_page(
     request: Request,
-    admin: User = Depends(require_admin),
+    material: Material | None,
+    form: MaterialForm,
+    error: str | None = None,
 ) -> Response:
     return templates.TemplateResponse(
         request,
         "materials/form.html",
-        {"units": UNITS, "material": None, "error": None},
+        {"units": UNITS, "material": material, "form": form, "error": error},
+        status_code=status.HTTP_400_BAD_REQUEST if error else status.HTTP_200_OK,
     )
+
+
+@router.get("/new")
+def new_material_form(
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Response:
+    return _form_page(request, None, _form_from_material(None, db))
 
 
 @router.post("/new")
@@ -146,30 +283,13 @@ def create_material(
     request: Request,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
-    code: str = Form(""),
-    name: str = Form(...),
-    unit: str = Form(...),
-    min_stock: str = Form(""),
-    sale_price: str = Form(""),
+    form: MaterialForm = Depends(_material_form),
 ) -> Response:
     try:
-        parsed_min_stock = _parse_min_stock(min_stock)
-        save_material(
-            db,
-            material=None,
-            name=name,
-            unit=unit,
-            code=code or None,
-            min_stock=parsed_min_stock,
-            sale_price=parse_money(sale_price),
-        )
+        _save_form(db, None, form)
     except _SAVE_ERRORS as exc:
-        return templates.TemplateResponse(
-            request,
-            "materials/form.html",
-            {"units": UNITS, "material": None, "error": _error_message(exc)},
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+        # EARS-H1-07: show again everything that was typed, not a blank form.
+        return _form_page(request, None, form, _error_message(exc))
 
     return RedirectResponse(url="/materials", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -182,11 +302,7 @@ def edit_material_form(
     db: Session = Depends(get_db),
 ) -> Response:
     material = _get_material_or_404(db, material_id)
-    return templates.TemplateResponse(
-        request,
-        "materials/form.html",
-        {"units": UNITS, "material": material, "error": None},
-    )
+    return _form_page(request, material, _form_from_material(material, db))
 
 
 @router.post("/{material_id}/edit")
@@ -195,33 +311,16 @@ def update_material(
     request: Request,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
-    code: str = Form(""),
-    name: str = Form(...),
-    unit: str = Form(...),
-    min_stock: str = Form(""),
-    sale_price: str = Form(""),
+    form: MaterialForm = Depends(_material_form),
 ) -> Response:
     material = _get_material_or_404(db, material_id)
     old_price = material.sale_price
 
     try:
-        parsed_min_stock = _parse_min_stock(min_stock)
-        save_material(
-            db,
-            material=material,
-            name=name,
-            unit=unit,
-            code=code or None,
-            min_stock=parsed_min_stock,
-            sale_price=parse_money(sale_price),
-        )
+        _save_form(db, material, form)
     except _SAVE_ERRORS as exc:
-        return templates.TemplateResponse(
-            request,
-            "materials/form.html",
-            {"units": UNITS, "material": material, "error": _error_message(exc)},
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+        # EARS-H1-07: what was typed, not what is saved.
+        return _form_page(request, material, form, _error_message(exc))
 
     # EARS-H1-09 (spec 004): a new reference price never touches sales already
     # registered, so warn once if some of this material's are still unpriced.

@@ -53,7 +53,9 @@ class Material(Base):
     sale_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Alternate unit put into use (a roll of 30 m...), spec 008. All five are
-    # set together or all left empty.
+    # set together or all left empty. The name is a key of `UNITS`, like
+    # `unit`; the factor is this material's own (one roll of paper may hold
+    # 30 m, another 15 m).
     alt_unit_name: Mapped[str | None] = mapped_column(String(30), nullable=True)
     alt_unit_factor: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 3), nullable=True

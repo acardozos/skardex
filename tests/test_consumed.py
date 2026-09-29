@@ -35,7 +35,7 @@ def _roll(
     material = Material(
         name=name,
         unit="m",
-        alt_unit_name="Rollo",
+        alt_unit_name="rollo",
         alt_unit_factor=Decimal(factor),
         alt_unit_reading=Decimal(reading),
         alt_unit_read_at=datetime(2026, 9, 29, 15, 0, tzinfo=UTC),
@@ -181,7 +181,7 @@ def test_only_movements_after_the_reading_count(
         "venta",
         movement_date=date(2026, 10, 5),
     )
-    roll.alt_unit_name = "Rollo"
+    roll.alt_unit_name = "rollo"
     roll.alt_unit_factor = Decimal("30")
     roll.alt_unit_reading = Decimal("5")
     roll.alt_unit_read_at = datetime(2026, 9, 29, 15, 0, tzinfo=UTC)

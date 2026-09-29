@@ -7,9 +7,6 @@ from sqlalchemy.orm import Session
 from skardex.constants import UNITS
 from skardex.models import Material, Movement
 
-# `Material.alt_unit_name` is `String(30)`.
-ALT_UNIT_NAME_MAX_LENGTH = 30
-
 
 class DuplicateMaterialCodeError(Exception):
     """Raised when a material code is already used by another material."""
@@ -32,7 +29,7 @@ class IncompleteAltUnitError(Exception):
 
 
 class InvalidAltUnitNameError(Exception):
-    """Raised when the alternate unit's name is too long to store."""
+    """Raised when the alternate unit is not part of the fixed UNITS list."""
 
 
 class InvalidAltUnitFactorError(Exception):
@@ -87,7 +84,9 @@ def save_material(
         raise IncompleteAltUnitError()
     reading = Decimal("0")
     if alt_unit_name is not None and alt_unit_factor is not None:
-        if len(alt_unit_name) > ALT_UNIT_NAME_MAX_LENGTH:
+        # Same fixed list as the unit of measure (rollo, caja, saco...): the
+        # factor belongs to each material, the name does not.
+        if alt_unit_name not in UNITS:
             raise InvalidAltUnitNameError(alt_unit_name)
         if alt_unit_factor <= 0:
             raise InvalidAltUnitFactorError(alt_unit_factor)

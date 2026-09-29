@@ -4,7 +4,7 @@
 
 {% block content %}
 <main class="k-main">
-    <div class="k-formcard">
+    <div class="k-formcard k-formcard--wide">
         <div class="k-formhead">
             <p class="k-eyebrow">Catálogo</p>
             <h1>{% if material %}Editar artículo{% else %}Nuevo artículo{% endif %}</h1>
@@ -14,36 +14,76 @@
         <p class="k-banner k-banner--danger">{{ error }}</p>
         {% endif %}
 
-        <form class="k-form" method="post" action="{% if material %}/materials/{{ material.id }}/edit{% else %}/materials/new{% endif %}">
+        {#- Every value comes from `form`: what is saved when the page opens, or
+            what was typed when it comes back after an error (spec 008, H1-07). -#}
+        {#- From 1024px the alternate unit sits beside the item's own data
+            instead of below it (spec 008); narrower, everything stacks. -#}
+        <form class="k-form k-form--split" method="post" action="{% if material %}/materials/{{ material.id }}/edit{% else %}/materials/new{% endif %}">
+            <div class="k-form__main">
             <div class="k-field">
                 <label class="k-label" for="code">Código (opcional)</label>
-                <input class="k-input" type="text" id="code" name="code" placeholder="MAT-007" value="{{ (material.code or '') if material else '' }}">
+                <input class="k-input" type="text" id="code" name="code" placeholder="MAT-007" value="{{ form.code }}">
             </div>
             <div class="k-field">
                 <label class="k-label" for="name">Nombre</label>
-                <input class="k-input" type="text" id="name" name="name" required placeholder="Cemento gris 50 kg" value="{{ material.name if material else '' }}">
+                <input class="k-input" type="text" id="name" name="name" required placeholder="Cemento gris 50 kg" value="{{ form.name }}">
             </div>
             <div class="k-form__row">
                 <div class="k-field">
                     <label class="k-label" for="unit">Unidad de medida</label>
                     <select class="k-select" id="unit" name="unit" required>
-                        <option value="" disabled {% if not material %}selected{% endif %}>Selecciona una unidad</option>
+                        <option value="" disabled {% if not form.unit %}selected{% endif %}>Selecciona una unidad</option>
                         {% for u in units %}
-                        <option value="{{ u }}" {% if material and material.unit == u %}selected{% endif %}>{{ unit_labels.get(u, u) }}</option>
+                        <option value="{{ u }}" {% if form.unit == u %}selected{% endif %}>{{ unit_labels.get(u, u) }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="k-field">
                     <label class="k-label" for="min_stock">Stock mínimo (opcional)</label>
-                    <input class="k-input" type="number" step="0.001" min="0" id="min_stock" name="min_stock" placeholder="0" value="{{ material.min_stock if material and material.min_stock is not none else '' }}">
+                    <input class="k-input" type="number" step="0.001" min="0" id="min_stock" name="min_stock" placeholder="0" value="{{ form.min_stock }}">
                     <span class="k-help">Debajo de este saldo se avisa en Inicio.</span>
                 </div>
             </div>
             <div class="k-field">
                 <label class="k-label" for="sale_price">Precio de venta (opcional)</label>
-                <input class="k-input" type="number" step="0.01" min="0.01" id="sale_price" name="sale_price" placeholder="0,00" value="{{ material.sale_price if material and material.sale_price is not none else '' }}">
+                <input class="k-input" type="number" step="0.01" min="0.01" id="sale_price" name="sale_price" placeholder="0,00" value="{{ form.sale_price }}">
                 <span class="k-help">Por unidad de medida, en pesos. Es el precio de las salidas por venta; vacío = sin precio.</span>
             </div>
+            </div>
+
+            {#- Spec 008: the container put into use, for the Consumido column. -#}
+            <fieldset class="k-fieldset" id="alt-unit">
+                <legend class="k-fieldset__title">Unidad alterna (opcional)</legend>
+                <p class="k-help">El contenedor que se abre para usar o vender al detal, como un rollo o una caja. Con ella, el Inicio muestra cuánto va consumido del que está abierto.</p>
+                <div class="k-form__row">
+                    <div class="k-field">
+                        <label class="k-label" for="alt_unit_name">Unidad</label>
+                        <select class="k-select" id="alt_unit_name" name="alt_unit_name">
+                            <option value="" {% if not form.alt_unit_name %}selected{% endif %}>Sin unidad alterna</option>
+                            {% for u in units %}
+                            <option value="{{ u }}" {% if form.alt_unit_name == u %}selected{% endif %}>{{ unit_labels.get(u, u) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="k-field">
+                        <label class="k-label" for="alt_unit_factor">Factor</label>
+                        <input class="k-input" type="number" step="0.001" min="0.001" id="alt_unit_factor" name="alt_unit_factor" placeholder="30" value="{{ form.alt_unit_factor }}">
+                        <span class="k-help">Cuánto trae, en la unidad de medida del artículo.</span>
+                    </div>
+                </div>
+                <div class="k-field">
+                    <label class="k-label" for="alt_unit_reading">Consumido actual del contenedor abierto</label>
+                    <input class="k-input" type="number" step="0.001" min="0" id="alt_unit_reading" name="alt_unit_reading" placeholder="0" value="{{ form.alt_unit_reading }}">
+                    {% if form.alt_unit_shown_review == "1" %}
+                    <span class="k-help k-help--warn" id="alt-unit-review">Revisar: hay más entradas de Ajuste que salidas. Escribe lo que marca el tirro y guarda.</span>
+                    {% else %}
+                    <span class="k-help">Lo que marca el tirro. Vacío = contenedor nuevo. Cámbialo para recalibrar.</span>
+                    {% endif %}
+                </div>
+                <input type="hidden" name="alt_unit_reading_shown" value="{{ form.alt_unit_reading_shown }}">
+                <input type="hidden" name="alt_unit_shown_review" value="{{ form.alt_unit_shown_review }}">
+            </fieldset>
+
             <div class="k-form__actions">
                 <button type="submit" class="k-btn k-btn--primary">Guardar</button>
                 <a class="k-btn k-btn--ghost" href="/materials">Cancelar</a>

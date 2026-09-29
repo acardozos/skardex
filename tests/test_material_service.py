@@ -36,7 +36,7 @@ def _save(
 def _roll(db_session: Session, reading: str | None = "12") -> Material:
     return _save(
         db_session,
-        alt_unit_name="Rollo",
+        alt_unit_name="rollo",
         alt_unit_factor=Decimal("30"),
         alt_unit_reading=None if reading is None else Decimal(reading),
     )
@@ -86,7 +86,7 @@ def _count_materials(db_session: Session) -> int:
 @pytest.mark.parametrize(
     "alt_unit",
     [
-        {"alt_unit_name": "Rollo"},
+        {"alt_unit_name": "rollo"},
         {"alt_unit_factor": Decimal("30")},
         {"alt_unit_name": "   ", "alt_unit_factor": Decimal("30")},
     ],
@@ -104,7 +104,7 @@ def test_a_name_without_a_factor_or_the_reverse_is_rejected(
 def test_the_factor_must_be_greater_than_zero(db_session: Session, factor: str) -> None:
     """EARS-H1-03"""
     with pytest.raises(InvalidAltUnitFactorError):
-        _save(db_session, alt_unit_name="Rollo", alt_unit_factor=Decimal(factor))
+        _save(db_session, alt_unit_name="rollo", alt_unit_factor=Decimal(factor))
     assert _count_materials(db_session) == 0
 
 
@@ -118,10 +118,14 @@ def test_the_reading_must_be_from_zero_to_below_the_factor(
     assert _count_materials(db_session) == 0
 
 
-def test_a_name_too_long_to_store_is_rejected(db_session: Session) -> None:
-    """EARS-H1-02 (the column holds 30 characters)"""
+@pytest.mark.parametrize("name", ["tubo", "Rollo", "rollos"])
+def test_a_unit_outside_the_fixed_list_is_rejected(
+    db_session: Session, name: str
+) -> None:
+    """EARS-H1-02 (the same UNITS list as the unit of measure)"""
     with pytest.raises(InvalidAltUnitNameError):
-        _save(db_session, alt_unit_name="R" * 31, alt_unit_factor=Decimal("30"))
+        _save(db_session, alt_unit_name=name, alt_unit_factor=Decimal("30"))
+    assert _count_materials(db_session) == 0
 
 
 def test_a_rejected_edit_leaves_the_material_as_it_was(
@@ -133,13 +137,13 @@ def test_a_rejected_edit_leaves_the_material_as_it_was(
         _save(
             db_session,
             roll,
-            alt_unit_name="Caja",
+            alt_unit_name="caja",
             alt_unit_factor=Decimal("12"),
             alt_unit_reading=Decimal("20"),
             reading_shown=Decimal("12"),
         )
     db_session.refresh(roll)
-    assert roll.alt_unit_name == "Rollo"
+    assert roll.alt_unit_name == "rollo"
     assert roll.alt_unit_factor == Decimal("30")
 
 
@@ -155,12 +159,12 @@ def test_the_first_reading_is_saved_with_its_mark(
 
     roll = _save(
         db_session,
-        alt_unit_name=" Rollo ",
+        alt_unit_name=" rollo ",
         alt_unit_factor=Decimal("30"),
         alt_unit_reading=Decimal("12"),
     )
 
-    assert roll.alt_unit_name == "Rollo"
+    assert roll.alt_unit_name == "rollo"
     assert roll.alt_unit_reading == Decimal("12")
     assert roll.alt_unit_read_at is not None
     assert roll.alt_unit_read_after_id == mark
@@ -187,7 +191,7 @@ def test_adding_an_alternate_unit_to_an_existing_material_takes_a_reading(
         code=material.code,
         min_stock=material.min_stock,
         sale_price=material.sale_price,
-        alt_unit_name="Saco",
+        alt_unit_name="saco",
         alt_unit_factor=Decimal("50"),
         alt_unit_reading=Decimal("3"),
         reading_shown=None,
@@ -230,7 +234,7 @@ def test_saving_without_changes_keeps_the_reading_even_after_new_salidas(
     _save(
         db_session,
         roll,
-        alt_unit_name="Rollo",
+        alt_unit_name="rollo",
         alt_unit_factor=Decimal("30"),
         alt_unit_reading=shown,
         reading_shown=shown,
@@ -249,13 +253,13 @@ def test_renaming_alone_does_not_recalibrate(db_session: Session) -> None:
     _save(
         db_session,
         roll,
-        alt_unit_name="Rollo de 30 m",
+        alt_unit_name="caja",
         alt_unit_factor=Decimal("30"),
         alt_unit_reading=Decimal("12"),
         reading_shown=Decimal("12"),
     )
 
-    assert roll.alt_unit_name == "Rollo de 30 m"
+    assert roll.alt_unit_name == "caja"
     assert roll.alt_unit_read_after_id == mark
 
 
@@ -269,7 +273,7 @@ def test_a_different_reading_recalibrates(
     _save(
         db_session,
         roll,
-        alt_unit_name="Rollo",
+        alt_unit_name="rollo",
         alt_unit_factor=Decimal("30"),
         alt_unit_reading=Decimal("20"),
         reading_shown=Decimal("17"),
@@ -290,7 +294,7 @@ def test_a_new_factor_recalibrates_with_the_reading_sent(
     _save(
         db_session,
         roll,
-        alt_unit_name="Rollo",
+        alt_unit_name="rollo",
         alt_unit_factor=Decimal("50"),
         alt_unit_reading=Decimal("17"),
         reading_shown=Decimal("17"),
@@ -324,7 +328,7 @@ def test_saving_while_in_review_recalibrates_even_to_the_same_zero(
     _save(
         db_session,
         roll,
-        alt_unit_name="Rollo",
+        alt_unit_name="rollo",
         alt_unit_factor=Decimal("30"),
         alt_unit_reading=Decimal("0"),
         reading_shown=Decimal("0"),

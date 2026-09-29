@@ -287,6 +287,19 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .k-textarea{resize:vertical;min-height:72px}
 .k-input:focus,.k-select:focus,.k-textarea:focus{border-color:var(--accent)}
 .k-help{font-size:13px;color:var(--muted)}
+.k-help--warn{color:var(--warn)}
+/* A group of optional fields inside a form (the alternate unit, spec 008). */
+.k-fieldset{border:0;border-top:1px solid var(--border);margin:6px 0 0;padding:16px 0 0;min-width:0;display:flex;flex-direction:column;gap:16px}
+.k-fieldset__title{padding:0;font-size:15px;font-weight:700;color:var(--text)}
+/* A form in two columns from 1024px (the item form, spec 008): its own data
+   on the left, the optional group on the right; narrower, it all stacks. */
+.k-form__main{display:flex;flex-direction:column;gap:16px}
+@media (min-width:1024px){
+  .k-formcard--wide{max-width:880px}
+  .k-form--split{display:grid;grid-template-columns:1fr 1fr;column-gap:32px;row-gap:16px;align-items:start}
+  .k-form--split .k-fieldset{margin:0;padding:0 0 0 32px;border-top:0;border-left:1px solid var(--border)}
+  .k-form--split .k-form__actions{grid-column:1 / -1}
+}
 .k-error{font-size:13px;color:var(--danger)}
 .k-field--error .k-input,.k-field--error .k-select{border-color:var(--danger)}
 .k-form__actions{display:flex;gap:10px;margin-top:6px}
