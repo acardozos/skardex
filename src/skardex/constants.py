@@ -48,6 +48,9 @@ UNIT_LABELS: dict[str, str] = {
 }
 
 SALE_REASON = "venta"
+# Shared by entradas and salidas (spec 006): it corrects an earlier wrong
+# movement, so it never counts as consumption (spec 008).
+ADJUSTMENT_REASON = "ajuste"
 
 # Why an entrada happens. Never charged, never affects billing. Stored as
 # the key; the dict order is the order of its <select> in the movement form.
