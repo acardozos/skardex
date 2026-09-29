@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from skardex.models import Material, Movement, MovementType, User
-from skardex.quantities import format_quantity
+from skardex.quantities import InvalidMeasureError, format_quantity, parse_measure
 
 
 @pytest.mark.parametrize(
@@ -87,3 +87,42 @@ def test_the_minimum_field_keeps_a_dot_for_the_browser(
     form = admin_client.get(f"/materials/{cement.id}/edit").text
 
     assert 'id="min_stock" name="min_stock" placeholder="0" value="12.500"' in form
+
+
+@pytest.mark.parametrize(
+    ("raw", "allow_zero", "parsed"),
+    [
+        ("30", False, Decimal("30")),
+        (" 27.5 ", False, Decimal("27.5")),
+        ("0.125", False, Decimal("0.125")),
+        ("30.500", False, Decimal("30.5")),  # trailing zeros are not decimals
+        ("0", True, Decimal("0")),
+        ("", False, None),
+        ("   ", True, None),
+    ],
+)
+def test_parse_measure_reads_valid_values(
+    raw: str, allow_zero: bool, parsed: Decimal | None
+) -> None:
+    """EARS-H1-03, H1-04 (spec 008)"""
+    assert parse_measure(raw, allow_zero=allow_zero) == parsed
+
+
+@pytest.mark.parametrize(
+    ("raw", "allow_zero"),
+    [
+        ("0", False),
+        ("-1", True),
+        ("30.0005", False),  # more than 3 decimals
+        ("abc", True),
+        ("NaN", True),
+        ("Infinity", True),
+        ("1000000000", True),  # does not fit Numeric(12, 3)
+    ],
+)
+def test_parse_measure_rejects_what_cannot_be_stored(
+    raw: str, allow_zero: bool
+) -> None:
+    """EARS-H1-03, H1-04 (spec 008)"""
+    with pytest.raises(InvalidMeasureError):
+        parse_measure(raw, allow_zero=allow_zero)
