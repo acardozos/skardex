@@ -19,7 +19,7 @@ from skardex.services.material_service import (
 
 
 def _save(
-    db_session: Session, material: Material | None = None, **alt_unit: object
+    db_session: Session, material: Material | None = None, /, **alt_unit: object
 ) -> Material:
     return save_material(
         db_session,
@@ -73,7 +73,7 @@ def _consumed(db_session: Session, material: Material) -> Decimal:
 
 
 def _last_movement_id(db_session: Session) -> int:
-    return db_session.query(func.coalesce(func.max(Movement.id), 0)).scalar()
+    return int(db_session.query(func.coalesce(func.max(Movement.id), 0)).scalar())
 
 
 def _count_materials(db_session: Session) -> int:

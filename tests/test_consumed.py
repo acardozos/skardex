@@ -47,7 +47,7 @@ def _roll(
 
 
 def _last_movement_id(db_session: Session) -> int:
-    return db_session.query(func.coalesce(func.max(Movement.id), 0)).scalar()
+    return int(db_session.query(func.coalesce(func.max(Movement.id), 0)).scalar())
 
 
 def _move(
