@@ -100,6 +100,7 @@
                     <th>Unidad</th>
                     <th class="k-num">Saldo actual</th>
                     <th class="k-num">Stock mínimo</th>
+                    <th class="k-num">Consumido</th>
                     <th class="k-num">Estado</th>
                 </tr>
             </thead>
@@ -111,10 +112,24 @@
                     <td class="k-dim k-only-table">{{ unit }}</td>
                     <td class="k-num k-only-table{{ ' k-low' if item.is_low else '' }}">{{ item.balance | qty }}</td>
                     <td class="k-num k-dim k-only-table">{{ item.material.min_stock | qty if item.material.min_stock is not none else "-" }}</td>
+                    {#- Spec 008: how much of the open container is used up. -#}
+                    {% set c = item.consumed %}
+                    {% if c %}
+                    <td class="k-num k-only-table k-consumed">{{ c.consumed | qty }} de {{ c.factor | qty }} {{ unit }}
+                        {%- if c.needs_review %} <span class="k-tag k-tag--warn">Revisar</span><span class="k-consumed__note">Hay más entradas de Ajuste que salidas</span>{% endif -%}
+                    </td>
+                    {% else %}
+                    <td class="k-num k-dim k-only-table">-</td>
+                    {% endif %}
                     <td class="k-num k-c-state"><span class="k-tag {{ 'k-tag--warn' if item.is_low else 'k-tag--ok' }}">{{ "Bajo mínimo" if item.is_low else "En orden" }}</span></td>
                     <td class="k-only-card k-c-meta k-meta">
                         <span class="k-num{{ ' k-low' if item.is_low else '' }}">{{ item.balance | qty }} {{ unit }}</span>
                         {%- if item.material.min_stock is not none %}<span>mín. {{ item.material.min_stock | qty }}</span>{% endif -%}
+                        {%- if c %}<span>consumido {{ c.consumed | qty }} de {{ c.factor | qty }} {{ unit }}
+                            {%- if c.needs_review %} <span class="k-tag k-tag--warn">Revisar</span>{% endif -%}
+                        </span>
+                        {%- if c.needs_review %}<span class="k-consumed__note">Hay más entradas de Ajuste que salidas</span>{% endif %}
+                        {%- endif -%}
                     </td>
                 </tr>
                 {% endfor %}

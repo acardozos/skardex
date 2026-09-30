@@ -1,7 +1,7 @@
 import html as html_lib
 import re
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
 
@@ -736,3 +736,133 @@ def test_the_low_stock_filter_keeps_both_shortcuts(
 def _below(html: str) -> str:
     """The full controls under the list (spec 007 added compact ones above)."""
     return html[html.index('class="k-pager"') :]
+
+
+# --- Spec 008: the Consumido column -----------------------------------------
+
+
+def _consumed_cell(html: str, name: str) -> str:
+    """The table-only Consumido cell of the balance row for `name`."""
+    row = re.search(rf"<tr>(?:(?!</tr>).)*?>{re.escape(name)}</td>.*?</tr>", html, re.S)
+    assert row is not None, f"row {name!r} not found"
+    cells = re.findall(
+        r'<td class="k-num[^"]*k-only-table[^"]*">(.*?)</td>', row.group(0), re.S
+    )
+    # Balance, minimum, Consumido: the third table-only number.
+    return re.sub(r"\s+", " ", cells[2]).strip()
+
+
+def _with_roll(
+    db_session: Session,
+    user: User,
+    *,
+    name: str = "Papel polarizado",
+    factor: str = "30",
+    reading: str = "0",
+    moves: tuple[tuple[MovementType, str, str], ...] = (),
+) -> Material:
+    material = Material(
+        name=name,
+        unit="m",
+        alt_unit_name="rollo",
+        alt_unit_factor=Decimal(factor),
+        alt_unit_reading=Decimal(reading),
+        alt_unit_read_at=datetime(2026, 9, 29, 15, 0, tzinfo=UTC),
+        alt_unit_read_after_id=0,
+    )
+    db_session.add(material)
+    db_session.commit()
+    for movement_type, quantity, reason in moves:
+        db_session.add(
+            Movement(
+                material_id=material.id,
+                user_id=user.id,
+                type=movement_type,
+                quantity=Decimal(quantity),
+                movement_date=date(2026, 9, 29),
+                reason=reason,
+            )
+        )
+    db_session.commit()
+    return material
+
+
+def test_the_balances_have_a_consumido_column_for_both_roles(
+    admin_client: TestClient,
+    operario_client: TestClient,
+    db_session: Session,
+    admin_user: User,
+) -> None:
+    """EARS-H2-01, H2-06 (spec 008)"""
+    _with_roll(
+        db_session,
+        admin_user,
+        moves=(
+            (MovementType.ENTRADA, "90", "compra"),
+            (MovementType.SALIDA, "40", "venta"),
+        ),
+    )
+
+    for client in (admin_client, operario_client):
+        html = client.get("/").text
+        assert '<th class="k-num">Consumido</th>' in html
+        assert _consumed_cell(html, "Papel polarizado") == "10 de 30 m"
+
+
+def test_consumido_shows_decimals_the_colombian_way(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H2-06 (spec 008)"""
+    _with_roll(
+        db_session,
+        admin_user,
+        factor="30.5",
+        moves=(
+            (MovementType.ENTRADA, "90", "compra"),
+            (MovementType.SALIDA, "2.5", "venta"),
+        ),
+    )
+
+    html = admin_client.get("/").text
+
+    assert _consumed_cell(html, "Papel polarizado") == "2,5 de 30,5 m"
+    assert _card_line(html, "Papel polarizado") == (
+        '<span class="k-num">87,5 m</span><span>consumido 2,5 de 30,5 m</span>'
+    )
+
+
+def test_without_an_alternate_unit_the_cell_shows_a_dash_and_the_card_nothing(
+    admin_client: TestClient, db_session: Session
+) -> None:
+    """EARS-H2-07, H2-09 (spec 008)"""
+    db_session.add(Material(name="Cemento", unit="kg"))
+    db_session.commit()
+
+    html = admin_client.get("/").text
+
+    assert _consumed_cell(html, "Cemento") == "-"
+    assert _card_line(html, "Cemento") == '<span class="k-num">0 kg</span>'
+
+
+def test_a_negative_sum_shows_zero_with_revisar_and_why(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H2-08, H2-09 (spec 008)"""
+    _with_roll(
+        db_session,
+        admin_user,
+        reading="2",
+        moves=((MovementType.ENTRADA, "5", "ajuste"),),
+    )
+
+    html = admin_client.get("/").text
+
+    note = (
+        '<span class="k-consumed__note">Hay más entradas de Ajuste que salidas</span>'
+    )
+    revisar = '<span class="k-tag k-tag--warn">Revisar</span>'
+    assert _consumed_cell(html, "Papel polarizado") == f"0 de 30 m {revisar}{note}"
+    assert _card_line(html, "Papel polarizado") == (
+        '<span class="k-num">5 m</span>'
+        f"<span>consumido 0 de 30 m {revisar}</span>{note}"
+    )

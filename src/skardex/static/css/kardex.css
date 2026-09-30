@@ -205,6 +205,10 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
    the card leaves it out instead of printing "-". */
 .k-only-card{display:none}
 .k-meta > span + span::before{content:" · "}
+/* Consumido "in review" (spec 008): the note goes under the value in the
+   table, and may wrap, unlike the number and the tag. */
+.k-consumed__note{display:block;white-space:normal;font-size:13px;font-weight:400;color:var(--muted)}
+.k-meta > .k-consumed__note::before{content:none}
 @media (max-width:719.98px){
   .k-table--cards thead{display:none}
   .k-table--cards tr{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
