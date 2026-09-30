@@ -97,7 +97,6 @@
             <thead>
                 <tr>
                     <th>Artículo</th>
-                    <th>Unidad</th>
                     <th class="k-num">Saldo actual</th>
                     <th class="k-num">Stock mínimo</th>
                     <th class="k-num">Consumido</th>
@@ -109,8 +108,9 @@
                 <tr>
                     {% set unit = unit_labels.get(item.material.unit, item.material.unit) %}
                     <td class="k-strong k-c-name">{{ item.material.name }}</td>
-                    <td class="k-dim k-only-table">{{ unit }}</td>
-                    <td class="k-num k-only-table{{ ' k-low' if item.is_low else '' }}">{{ item.balance | qty }}</td>
+                    {#- The unit rides with the balance, as the quantity does in
+                        Movimientos: no column of its own (spec 008, task 6). -#}
+                    <td class="k-num k-only-table{{ ' k-low' if item.is_low else '' }}">{{ item.balance | qty }} {{ unit }}</td>
                     <td class="k-num k-dim k-only-table">{{ item.material.min_stock | qty if item.material.min_stock is not none else "-" }}</td>
                     {#- Spec 008: how much of the open container is used up. -#}
                     {% set c = item.consumed %}

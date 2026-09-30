@@ -204,7 +204,12 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
    are marked .k-only-table / .k-only-card; an empty cell is .is-empty and
    the card leaves it out instead of printing "-". */
 .k-only-card{display:none}
-.k-meta > span + span::before{content:" · "}
+/* Each datum of the line stays whole ("mín. 48", "consumido 5 de 24 unidad")
+   and the line breaks only at the " · " between data, which keeps normal
+   wrapping: the templates leave no space between the spans (spec 008,
+   task 6). */
+.k-meta > span:not(.k-consumed__note){white-space:nowrap}
+.k-meta > span + span::before{content:" · ";white-space:normal}
 /* Consumido "in review" (spec 008): the note goes under the value in the
    table, and may wrap, unlike the number and the tag. */
 .k-consumed__note{display:block;white-space:normal;font-size:13px;font-weight:400;color:var(--muted)}

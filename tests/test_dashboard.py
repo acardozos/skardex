@@ -643,7 +643,8 @@ def test_a_materials_balance_is_the_same_on_any_page_or_filter(
         )
     }
 
-    assert set(seen.values()) == {"3,5"}, seen  # 3.5 units (spec 004 H3-07)
+    # 3.5 units (spec 004 H3-07), with its unit since spec 008 (task 6).
+    assert set(seen.values()) == {"3,5 kg"}, seen
 
 
 def test_the_dashboard_does_not_echo_unknown_parameters(
@@ -866,3 +867,39 @@ def test_a_negative_sum_shows_zero_with_revisar_and_why(
         '<span class="k-num">5 m</span>'
         f"<span>consumido 0 de 30 m {revisar}</span>{note}"
     )
+
+
+def test_the_balance_carries_its_unit_and_there_is_no_unit_column(
+    admin_client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """EARS-H2-10 (spec 008): the table had to fit again at 720px."""
+    _with_roll(
+        db_session,
+        admin_user,
+        moves=((MovementType.ENTRADA, "12484.25", "compra"),),
+    )
+
+    html = admin_client.get("/").text
+
+    assert "<th>Unidad</th>" not in html
+    assert _balances_cell(html, "Papel polarizado") == "12.484,25 m"
+
+
+def _balances_cell(html: str, name: str) -> str:
+    """The table-only balance cell of the row for `name`."""
+    row = re.search(rf"<tr>(?:(?!</tr>).)*?>{re.escape(name)}</td>.*?</tr>", html, re.S)
+    assert row is not None, f"row {name!r} not found"
+    cells = re.findall(
+        r'<td class="k-num[^"]*k-only-table[^"]*">(.*?)</td>', row.group(0), re.S
+    )
+    return re.sub(r"\s+", " ", cells[0]).strip()
+
+
+def test_each_datum_of_a_card_line_stays_whole(client: TestClient) -> None:
+    """EARS-H2-10 (spec 008): "mín. 48" or "consumido 5 de 24 unidad" never
+    split; the line breaks only between data. The note of "Revisar" may."""
+    css = client.get("/static/css/kardex.css").text
+
+    assert ".k-meta > span:not(.k-consumed__note){white-space:nowrap}" in css
+    assert '.k-meta > span + span::before{content:" · ";white-space:normal}' in css
+    assert ".k-consumed__note{display:block;white-space:normal;" in css
