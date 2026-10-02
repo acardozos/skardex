@@ -9,6 +9,7 @@ from skardex.constants import (
     ADJUSTMENT_REASON,
     ADMIN_ONLY_REASONS,
     ENTRADA_REASONS,
+    NOT_CONSUMPTION_REASONS,
     REVERSAL_REASON,
     SALE_REASON,
     SALIDA_REASONS,
@@ -130,21 +131,26 @@ def get_balances_for_active_materials(db: Session) -> dict[int, Decimal]:
 
 
 def _counted_quantity() -> object:
-    """What a movement adds to the consumed sum (spec 008).
+    """What a movement adds to the consumed sum (spec 008, by salida since
+    spec 009).
 
-    Every salida but an Ajuste counts; an Ajuste entrada undoes a salida
-    registered by mistake, so it subtracts. Any other entrada (compra,
-    devolución, otro, none) is left out. COALESCE matters: a salida with no
-    reason (older than spec 004) must count, and `NULL <> 'ajuste'` is NULL,
-    which would leave it out.
+    Each salida that is consumption adds what is left of it after its
+    Reversos, so a Reverso needs no term of its own: one of a salida from
+    before the reading changes nothing (that salida is not in the sum), and
+    reversing a Reverso gives the salida back. A Reverso, a count adjustment
+    and an old Ajuste salida are not consumption. An old Ajuste entrada
+    still subtracts, as in spec 008 (the only way left to "Revisar"). Any
+    other entrada is left out. COALESCE matters: a salida with no reason
+    (older than spec 004) must count, and `NULL NOT IN (...)` is NULL, which
+    would leave it out.
     """
     return case(
         (
             and_(
                 Movement.type == MovementType.SALIDA,
-                func.coalesce(Movement.reason, "") != ADJUSTMENT_REASON,
+                func.coalesce(Movement.reason, "").not_in(NOT_CONSUMPTION_REASONS),
             ),
-            Movement.quantity,
+            Movement.quantity - Movement.reversed_quantity,
         ),
         (
             and_(

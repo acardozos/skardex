@@ -1,7 +1,9 @@
 """How much of the open container is used up: the Consumido formula (spec 008).
 
-Consumido = (reading + Σ salidas but Ajuste − Σ Ajuste entradas) % factor,
-counting only movements registered after the reading.
+Consumido = (reading + Σ what is left of each consumption salida − Σ old
+Ajuste entradas) % factor, counting only movements registered after the
+reading. Since spec 009 each salida counts by what is left of it after its
+Reversos, and a Reverso or a count adjustment is not consumption.
 """
 
 from datetime import UTC, date, datetime
@@ -11,7 +13,7 @@ import pytest
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from skardex.constants import SALIDA_REASONS
+from skardex.constants import NOT_CONSUMPTION_REASONS, SALIDA_REASONS
 from skardex.models import Material, Movement, MovementType, User
 from skardex.services.kardex_service import (
     ConsumedStatus,
@@ -59,18 +61,20 @@ def _move(
     reason: str | None,
     *,
     movement_date: date = date(2026, 9, 29),
-) -> None:
-    db_session.add(
-        Movement(
-            material_id=material.id,
-            user_id=user.id,
-            type=movement_type,
-            quantity=Decimal(quantity),
-            movement_date=movement_date,
-            reason=reason,
-        )
+    reverses: Movement | None = None,
+) -> Movement:
+    movement = Movement(
+        material_id=material.id,
+        user_id=user.id,
+        type=movement_type,
+        quantity=Decimal(quantity),
+        movement_date=movement_date,
+        reason=reason,
+        reverses_id=reverses.id if reverses is not None else None,
     )
+    db_session.add(movement)
     db_session.commit()
+    return movement
 
 
 def _consumed(db_session: Session, material: Material) -> ConsumedStatus:
@@ -79,11 +83,13 @@ def _consumed(db_session: Session, material: Material) -> ConsumedStatus:
     return status
 
 
-@pytest.mark.parametrize("reason", [r for r in SALIDA_REASONS if r != "ajuste"])
-def test_every_salida_but_ajuste_counts(
+@pytest.mark.parametrize(
+    "reason", [r for r in SALIDA_REASONS if r not in NOT_CONSUMPTION_REASONS]
+)
+def test_every_consumption_salida_counts(
     db_session: Session, admin_user: User, reason: str
 ) -> None:
-    """EARS-H2-03"""
+    """EARS-H2-03 (spec 008); since spec 009 "conteo" is left out (H6-04)"""
     roll = _roll(db_session)
     _move(db_session, roll, admin_user, ENTRADA, "90", "compra")
     _move(db_session, roll, admin_user, SALIDA, "7", reason)
@@ -251,3 +257,128 @@ def test_the_dashboard_carries_it_for_active_materials_only(
     assert roll_status is not None
     assert roll_status.consumed == Decimal("1")
     assert items[material.id].consumed is None
+
+
+# --- Spec 009: by salida, by what is left of it -----------------------------
+
+
+def test_a_partially_reversed_salida_counts_what_is_left(
+    db_session: Session, admin_user: User
+) -> None:
+    """EARS-H6-01"""
+    roll = _roll(db_session)
+    _move(db_session, roll, admin_user, ENTRADA, "90", "compra")
+    sale = _move(db_session, roll, admin_user, SALIDA, "10", "venta")
+    _move(db_session, roll, admin_user, ENTRADA, "3", "reverso", reverses=sale)
+
+    assert _consumed(db_session, roll).consumed == Decimal("7")
+
+
+def test_a_fully_reversed_salida_counts_nothing(
+    db_session: Session, admin_user: User
+) -> None:
+    """EARS-H6-01"""
+    roll = _roll(db_session)
+    _move(db_session, roll, admin_user, ENTRADA, "90", "compra")
+    _move(db_session, roll, admin_user, SALIDA, "4", "merma")
+    sale = _move(db_session, roll, admin_user, SALIDA, "10", "venta")
+    _move(db_session, roll, admin_user, ENTRADA, "10", "reverso", reverses=sale)
+
+    status = _consumed(db_session, roll)
+    assert status.consumed == Decimal("4")
+    assert status.needs_review is False
+
+
+def test_reversing_a_salida_from_before_the_reading_changes_nothing(
+    db_session: Session, admin_user: User
+) -> None:
+    """EARS-H6-02: the case that led to "Revisar" in spec 008"""
+    roll = Material(name="Papel", unit="m")
+    db_session.add(roll)
+    db_session.commit()
+    _move(db_session, roll, admin_user, ENTRADA, "90", "compra")
+    wrong = _move(db_session, roll, admin_user, SALIDA, "10", "venta")
+    roll.alt_unit_name = "rollo"
+    roll.alt_unit_factor = Decimal("30")
+    roll.alt_unit_reading = Decimal("5")
+    roll.alt_unit_read_at = datetime(2026, 9, 29, 15, 0, tzinfo=UTC)
+    roll.alt_unit_read_after_id = _last_movement_id(db_session)
+    db_session.commit()
+    _move(db_session, roll, admin_user, SALIDA, "2", "venta")
+    # Registered after the reading, but it reverses a salida from before it.
+    _move(db_session, roll, admin_user, ENTRADA, "10", "reverso", reverses=wrong)
+
+    status = _consumed(db_session, roll)
+    assert status.consumed == Decimal("7")
+    assert status.needs_review is False
+
+
+def test_reversing_a_reverso_counts_the_salida_again(
+    db_session: Session, admin_user: User
+) -> None:
+    """EARS-H6-03"""
+    roll = _roll(db_session)
+    _move(db_session, roll, admin_user, ENTRADA, "90", "compra")
+    sale = _move(db_session, roll, admin_user, SALIDA, "10", "venta")
+    reversal = _move(
+        db_session, roll, admin_user, ENTRADA, "4", "reverso", reverses=sale
+    )
+    assert _consumed(db_session, roll).consumed == Decimal("6")
+
+    _move(db_session, roll, admin_user, SALIDA, "1", "reverso", reverses=reversal)
+
+    assert _consumed(db_session, roll).consumed == Decimal("7")
+
+
+@pytest.mark.parametrize(
+    ("movement_type", "reason"),
+    [
+        (SALIDA, "reverso"),  # the Reverso of an entrada
+        (SALIDA, "conteo"),
+        (ENTRADA, "conteo"),
+        (SALIDA, "ajuste"),
+        (ENTRADA, "reverso"),  # the Reverso of a salida from before the reading
+    ],
+)
+def test_reversos_and_count_adjustments_are_not_consumption(
+    db_session: Session,
+    admin_user: User,
+    movement_type: MovementType,
+    reason: str,
+) -> None:
+    """EARS-H6-04: they neither add nor subtract"""
+    before_reading = Material(name="Papel", unit="m")
+    db_session.add(before_reading)
+    db_session.commit()
+    compra = _move(db_session, before_reading, admin_user, ENTRADA, "90", "compra")
+    old_sale = _move(db_session, before_reading, admin_user, SALIDA, "6", "venta")
+    roll = before_reading
+    roll.alt_unit_name = "rollo"
+    roll.alt_unit_factor = Decimal("30")
+    roll.alt_unit_reading = Decimal("0")
+    roll.alt_unit_read_at = datetime(2026, 9, 29, 15, 0, tzinfo=UTC)
+    roll.alt_unit_read_after_id = _last_movement_id(db_session)
+    db_session.commit()
+    _move(db_session, roll, admin_user, SALIDA, "10", "venta")
+    target = {"reverso": compra if movement_type == SALIDA else old_sale}.get(reason)
+    _move(db_session, roll, admin_user, movement_type, "3", reason, reverses=target)
+
+    assert _consumed(db_session, roll).consumed == Decimal("10")
+
+
+def test_old_ajuste_entradas_still_subtract_and_ask_for_review(
+    db_session: Session, admin_user: User
+) -> None:
+    """EARS-H6-05 (spec 008 unchanged, next to the new rules)"""
+    roll = _roll(db_session, reading="2")
+    _move(db_session, roll, admin_user, ENTRADA, "90", "compra")
+    sale = _move(db_session, roll, admin_user, SALIDA, "4", "venta")
+    _move(db_session, roll, admin_user, ENTRADA, "1", "reverso", reverses=sale)
+    _move(db_session, roll, admin_user, ENTRADA, "3", "ajuste")
+    assert _consumed(db_session, roll).consumed == Decimal("2")  # 2 + 3 - 3
+
+    _move(db_session, roll, admin_user, ENTRADA, "5", "ajuste")
+
+    status = _consumed(db_session, roll)
+    assert status.consumed == Decimal("0")
+    assert status.needs_review is True
