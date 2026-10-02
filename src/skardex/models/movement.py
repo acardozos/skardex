@@ -100,6 +100,11 @@ class Movement(Base):
     # Two foreign keys point at users, so each relationship must say which one.
     user: Mapped[User] = relationship(foreign_keys=[user_id])
     paid_by: Mapped[User | None] = relationship(foreign_keys=[paid_by_id])
+    # The movement this one offsets. The link's key also has `material_id`,
+    # which only guards the same-material rule; `id` alone finds the row.
+    reverses: Mapped["Movement | None"] = relationship(
+        remote_side=[id], foreign_keys=[reverses_id]
+    )
 
     if TYPE_CHECKING:
         # Mapped below the class: it queries this same table.
