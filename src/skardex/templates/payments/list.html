@@ -66,6 +66,7 @@
                     {% if can_pay %}
                     <th><label class="k-pick"><input type="checkbox" id="select-all" data-select-all aria-label="Seleccionar todas" {% if all_checked %}checked{% endif %}></label></th>
                     {% endif %}
+                    <th>N.º</th>
                     <th>Fecha</th>
                     <th>Artículo</th>
                     <th class="k-num">Cantidad</th>
@@ -85,6 +86,7 @@
                     {% if can_pay %}
                     <td><label class="k-pick"><input type="checkbox" name="movement_ids" value="{{ sale.id }}" data-amount="{{ sale.amount }}" aria-label="Incluir esta venta en el pago" {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></label></td>
                     {% endif %}
+                    <td class="k-dim">#{{ sale.id }}</td>
                     <td class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td class="k-strong">{{ sale.material.name }}</td>
                     {#- What is charged is what is left of the sale (spec 009): a
@@ -136,6 +138,8 @@
                 </div>
                 {#- The spans touch on purpose: `.k-meta` puts the " · " between them. -#}
                 <p class="k-pcard__meta k-meta">
+                    <span>#{{ sale.id }}</span>
+                    {#- -#}
                     <span>{{ sale.movement_date.strftime('%d/%m/%Y') }}</span>
                     {%- if sale.is_fully_reversed -%}
                     <span>{{ sale.quantity | qty }} {{ unit }}</span>

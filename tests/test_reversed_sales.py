@@ -281,3 +281,26 @@ def test_movimientos_shows_a_fully_reversed_sale_as_reversada(
     assert page.count('<span class="k-tag k-tag--neutral">Reversada</span>') == 4
     assert "$ 0,00" not in page
     assert "Sin precio" not in page
+
+
+def test_no_salida_reversed_entirely_offers_corregir_cobro(
+    admin_client: TestClient, db_session: Session, admin_user: User, make_sale: MakeSale
+) -> None:
+    """EARS-H3-09: a merma reversed entirely is not turned into a sale of 0,
+    while one reversed in part still can be."""
+    whole = make_sale(
+        "Merma-toda", user=admin_user, quantity="2", price=None, reason="merma"
+    )
+    _reverse(db_session, whole, admin_user, "2")
+    part = make_sale(
+        "Merma-parte", user=admin_user, quantity="2", price=None, reason="merma"
+    )
+    _reverse(db_session, part, admin_user, "1")
+
+    page = admin_client.get("/movements").text
+    assert f"/movements/{whole.id}/billing" not in page
+    assert f"/movements/{part.id}/billing" in page
+    assert admin_client.get(f"/movements/{whole.id}/billing").status_code == 404
+    with pytest.raises(NotReclassifiableError):
+        update_billing(db_session, whole, reason="venta", provided_price=None)
+    assert whole.reason == "merma"
