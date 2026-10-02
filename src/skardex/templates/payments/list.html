@@ -80,23 +80,33 @@
             </thead>
             <tbody>
                 {% for sale in sales %}
+                {% set unit = unit_labels.get(sale.material.unit, sale.material.unit) %}
                 <tr{% if can_pay %} data-select-row{% endif %}>
                     {% if can_pay %}
                     <td><label class="k-pick"><input type="checkbox" name="movement_ids" value="{{ sale.id }}" data-amount="{{ sale.amount }}" aria-label="Incluir esta venta en el pago" {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></label></td>
                     {% endif %}
                     <td class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td class="k-strong">{{ sale.material.name }}</td>
-                    <td class="k-num">{{ sale.quantity | qty }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
+                    {#- What is charged is what is left of the sale (spec 009): a
+                        reversed part shows below it; reversed entirely, no amount. -#}
+                    {% if sale.is_fully_reversed %}
+                    <td class="k-num">{{ sale.quantity | qty }} {{ unit }}</td>
+                    <td class="k-num">{{ sale.unit_price | cop }}</td>
+                    <td class="k-num k-dim">-</td>
+                    {% else %}
+                    <td class="k-num">{{ sale.remaining | qty }} {{ unit }}{% if sale.reversed_quantity %}<span class="k-reversed-note">{{ sale.reversed_quantity | qty }} reversados</span>{% endif %}</td>
                     <td class="k-num">{{ sale.unit_price | cop }}</td>
                     <td class="k-num k-strong">{{ sale.amount | cop }}</td>
+                    {% endif %}
                     {% if estado != "pendientes" %}
                     <td>
-                        {% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ sale.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
+                        {% if sale.is_fully_reversed %}<span class="k-tag k-tag--neutral">Reversada</span>
+                        {% elif sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ sale.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
                     </td>
                     {% endif %}
                     <td class="k-dim">{{ sale.note or "-" }}</td>
                     {% if user.role == "admin" %}
-                    <td><a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a></td>
+                    <td>{% if can_fix_billing(sale) %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}</td>
                     {% endif %}
                 </tr>
                 {% endfor %}
@@ -110,26 +120,39 @@
             with or without JavaScript. -#}
         <ul class="k-pcards" id="sales-cards">
             {% for sale in sales %}
+            {% set unit = unit_labels.get(sale.material.unit, sale.material.unit) %}
+            {% set can_fix = user.role == "admin" and can_fix_billing(sale) %}
             <li class="k-pcard"{% if can_pay %} data-select-row{% endif %}>
                 <div class="k-pcard__main">
                     {% if can_pay %}
                     <label class="k-pick"><input type="checkbox" data-twin="{{ sale.id }}" aria-label="Incluir esta venta en el pago" disabled {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></label>
                     {% endif %}
                     <span class="k-strong">{{ sale.material.name }}</span>
+                    {% if sale.is_fully_reversed %}
+                    <span class="k-pcard__amount"><span class="k-tag k-tag--neutral">Reversada</span></span>
+                    {% else %}
                     <span class="k-num k-strong k-pcard__amount">{{ sale.amount | cop }}</span>
+                    {% endif %}
                 </div>
+                {#- The spans touch on purpose: `.k-meta` puts the " · " between them. -#}
                 <p class="k-pcard__meta k-meta">
                     <span>{{ sale.movement_date.strftime('%d/%m/%Y') }}</span>
-                    {#- -#}
-                    <span>{{ sale.quantity | qty }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }} × {{ sale.unit_price | cop }}</span>
-                    {%- if estado != "pendientes" -%}
+                    {%- if sale.is_fully_reversed -%}
+                    <span>{{ sale.quantity | qty }} {{ unit }}</span>
+                    {%- else -%}
+                    <span>{{ sale.remaining | qty }} {{ unit }} × {{ sale.unit_price | cop }}</span>
+                    {%- if sale.reversed_quantity -%}
+                    <span>{{ sale.reversed_quantity | qty }} reversados</span>
+                    {%- endif -%}
+                    {%- endif -%}
+                    {%- if estado != "pendientes" and not sale.is_fully_reversed -%}
                     <span>{% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> {{ sale.paid_at.strftime('%d/%m/%Y') }}{% else %}<span class="k-tag">Pendiente</span>{% endif %}</span>
                     {%- endif -%}
                 </p>
-                {% if sale.note or user.role == "admin" %}
+                {% if sale.note or can_fix %}
                 <div class="k-pcard__foot">
                     {% if sale.note %}<p class="k-pcard__note">{{ sale.note }}</p>{% endif %}
-                    {% if user.role == "admin" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
+                    {% if can_fix %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
                 </div>
                 {% endif %}
             </li>

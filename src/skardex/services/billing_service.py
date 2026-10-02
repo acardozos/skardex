@@ -25,7 +25,8 @@ class InvalidReasonError(Exception):
 
 
 class NotReclassifiableError(Exception):
-    """Raised when correcting the billing of a Reverso or a count adjustment."""
+    """Raised when correcting the billing of a salida that "Corregir cobro"
+    does not apply to: a Reverso, a count adjustment, or one fully reversed."""
 
 
 class InvalidPriceError(Exception):
@@ -93,12 +94,20 @@ def billing_fields_for(
 
 
 def can_fix_billing(movement: Movement) -> bool:
-    """Whether "Corregir cobro" applies: any salida but a Reverso or a count
-    adjustment. Shared by the history's button, the route and the service."""
+    """Whether "Corregir cobro" applies: any salida but a Reverso, a count
+    adjustment (EARS-H5-10) or one fully reversed, which has nothing left to
+    charge (EARS-H3-05). Shared by the buttons, the route and the service."""
     return (
         movement.type == MovementType.SALIDA
         and movement.reason not in _NOT_RECLASSIFIABLE_REASONS
+        and not movement.is_fully_reversed
     )
+
+
+def _something_left() -> ColumnElement[bool]:
+    """In SQL, the opposite of `Movement.is_fully_reversed` (spec 009): a sale
+    reversed entirely leaves the pending list and the unpriced alert."""
+    return Movement.quantity > Movement.reversed_quantity
 
 
 def _is_pending_sale(movement: Movement) -> bool:
@@ -107,6 +116,7 @@ def _is_pending_sale(movement: Movement) -> bool:
         and movement.reason == SALE_REASON
         and movement.unit_price is not None
         and movement.paid_at is None
+        and not movement.is_fully_reversed
     )
 
 
@@ -114,8 +124,9 @@ def sales_query(db: Session, *, estado: str) -> Query[Movement]:
     """Sales that have a price, by payment status, already ordered.
 
     Sales without a price, salidas that are not sales and movements from
-    before this feature (no reason) never appear here. Every order ends in
-    `id` so paging never repeats or skips a row.
+    before this feature (no reason) never appear here; a sale reversed
+    entirely only in "todos", labelled as such. Every order ends in `id` so
+    paging never repeats or skips a row.
     """
     if estado not in ("pendientes", "pagados", "todos"):
         raise ValueError(estado)
@@ -127,7 +138,7 @@ def sales_query(db: Session, *, estado: str) -> Query[Movement]:
     )
     if estado == "pendientes":
         # Chronological, so a cut-off report reads oldest first.
-        return query.filter(Movement.paid_at.is_(None)).order_by(
+        return query.filter(Movement.paid_at.is_(None), _something_left()).order_by(
             Movement.movement_date, Movement.id
         )
     if estado == "pagados":
@@ -141,11 +152,13 @@ def list_sales(db: Session, *, estado: str) -> list[Movement]:
 
 
 def unpriced_sale_conditions() -> tuple[ColumnElement[bool], ...]:
-    """The one definition of a "sale without price", shared by every query."""
+    """The one definition of a "sale without price", shared by every query.
+    A sale reversed entirely is no longer one: there is nothing to price."""
     return (
         Movement.type == MovementType.SALIDA,
         Movement.reason == SALE_REASON,
         Movement.unit_price.is_(None),
+        _something_left(),
     )
 
 

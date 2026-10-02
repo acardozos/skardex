@@ -452,6 +452,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
    cobro", "Reversar", or why it cannot be reversed yet (spec 009). */
 .k-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .k-actions__hint{font-size:13px;color:var(--muted)}
+/* Under a sale's quantity in Pagos: how much of it was reversed (spec 009). */
+.k-reversed-note{display:block;font-size:13px;color:var(--muted)}
 
 /* ---------- Pagos: touch selection and fixed pay bar (spec 007, H3) ---------- */
 /* A money KPI shrinks its figure to fit its own card, not the screen: the

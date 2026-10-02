@@ -157,7 +157,13 @@
                         {%- if movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
                         {%- else -%}Sin motivo{%- endif -%}
                     </td>
-                    {% if movement.reason == "venta" and movement.unit_price is none %}
+                    {#- A sale reversed entirely is not charged, nor priced (spec 009,
+                        H3-02): the same "Reversada" Pagos shows, without amount. -#}
+                    {% if movement.reason == "venta" and movement.is_fully_reversed %}
+                    <td class="k-num k-dim">{{ movement.unit_price | cop if movement.unit_price is not none else "-" }}</td>
+                    <td class="k-num k-dim">-</td>
+                    <td><span class="k-tag k-tag--neutral">Reversada</span></td>
+                    {% elif movement.reason == "venta" and movement.unit_price is none %}
                     <td class="k-num"><span class="k-tag k-tag--warn">Sin precio</span></td>
                     <td class="k-num k-dim">-</td>
                     <td class="k-dim">-</td>
@@ -205,7 +211,9 @@
                 <div class="k-mcard__billing">
                     {% if is_sale %}
                     <span class="k-mcard__amount">
-                        {%- if movement.unit_price is none -%}
+                        {%- if movement.is_fully_reversed -%}
+                        <span class="k-tag k-tag--neutral">Reversada</span>
+                        {%- elif movement.unit_price is none -%}
                         <span class="k-tag k-tag--warn">Sin precio</span>
                         {%- else -%}
                         <span class="k-num k-strong">{{ movement.amount | cop }}</span>
