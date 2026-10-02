@@ -1,6 +1,7 @@
 import enum
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     CheckConstraint,
@@ -8,11 +9,16 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    ForeignKeyConstraint,
+    Integer,
     Numeric,
     String,
+    UniqueConstraint,
     func,
+    select,
+    type_coerce,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from skardex.models.base import Base
 from skardex.models.material import Material
@@ -47,6 +53,23 @@ class Movement(Base):
             ),
             name="ck_movements_billing_only_for_sales",
         ),
+        # A link (`reverses_id`) only says "this movement offsets that one";
+        # which reasons may carry it is the reversal service's rule, so the
+        # schema never mentions a reason (spec 010 adds Traslado without a
+        # migration). The pair is already unique because `id` is; Postgres
+        # still needs it declared to be the target of a foreign key.
+        UniqueConstraint("id", "material_id", name="uq_movements_id_material"),
+        # Two columns, so a link can only point at a movement of the same
+        # material. With `reverses_id` NULL the key is not checked.
+        ForeignKeyConstraint(
+            ["reverses_id", "material_id"],
+            ["movements.id", "movements.material_id"],
+            name="fk_movements_reverses_same_material",
+        ),
+        CheckConstraint(
+            "reverses_id IS NULL OR reverses_id <> id",
+            name="ck_movements_not_self_reverse",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -68,6 +91,7 @@ class Movement(Base):
     paid_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    reverses_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -77,8 +101,50 @@ class Movement(Base):
     user: Mapped[User] = relationship(foreign_keys=[user_id])
     paid_by: Mapped[User | None] = relationship(foreign_keys=[paid_by_id])
 
+    if TYPE_CHECKING:
+        # Mapped below the class: it queries this same table.
+        reversed_quantity: Mapped[Decimal]
+
+    @property
+    def remaining(self) -> Decimal:
+        """Quantity minus what was reversed: what is left to reverse.
+
+        A movement not yet saved has no reversals, and no loaded value.
+        """
+        return self.quantity - (self.reversed_quantity or Decimal("0"))
+
+    @property
+    def is_fully_reversed(self) -> bool:
+        return self.remaining == 0
+
     @property
     def amount(self) -> Decimal | None:
+        """What is charged: what is left of the sale, by its price."""
         if self.unit_price is None:
             return None
-        return line_amount(self.quantity, self.unit_price)
+        return line_amount(self.remaining, self.unit_price)
+
+
+# What was reversed of a movement, computed on read like the balance, never
+# stored: the sum of its reversals, each minus what was in turn reversed of
+# it. Two levels are enough: a reversal of a reversal cannot be reversed.
+_reversal = Movement.__table__.alias("reversal")
+_counter_reversal = Movement.__table__.alias("counter_reversal")
+_counter_reversed = (
+    select(func.coalesce(func.sum(_counter_reversal.c.quantity), 0))
+    .where(_counter_reversal.c.reverses_id == _reversal.c.id)
+    .correlate(_reversal)
+    .scalar_subquery()
+)
+Movement.reversed_quantity = column_property(
+    select(
+        # Numeric, so SQLite (which sums as float) returns a 3-decimal Decimal.
+        type_coerce(
+            func.coalesce(func.sum(_reversal.c.quantity - _counter_reversed), 0),
+            Numeric(12, 3),
+        )
+    )
+    .where(_reversal.c.reverses_id == Movement.id)
+    .correlate_except(_reversal)
+    .scalar_subquery()
+)

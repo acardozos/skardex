@@ -4,14 +4,23 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import ConnectionPoolEntry, StaticPool
 
 from skardex.db import get_db
 from skardex.main import app
 from skardex.models import Base, Material, Movement, MovementType, User, UserRole
 from skardex.security import hash_password
+
+
+def _enable_sqlite_foreign_keys(
+    dbapi_connection: DBAPIConnection, _record: ConnectionPoolEntry
+) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 @pytest.fixture
@@ -21,6 +30,9 @@ def db_session() -> Generator[Session, None, None]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+    # SQLite ignores foreign keys unless asked, and Postgres never does: without
+    # this, a broken key (e.g. the same-material link of spec 009) would pass.
+    event.listen(engine, "connect", _enable_sqlite_foreign_keys)
     Base.metadata.create_all(engine)
     testing_session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     session = testing_session_local()
