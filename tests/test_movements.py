@@ -1726,7 +1726,8 @@ def test_the_admin_can_correct_any_salida_from_its_card(
     admin_client: TestClient, admin_user: User, db_session: Session
 ) -> None:
     """EARS-H2-07, H2-08 — a non-sale salida gets a billing line with just the
-    button; an entrada never gets one."""
+    buttons; an entrada never gets "Corregir cobro" (since spec 009 its line
+    can still hold "Reversar")."""
     sale = _history_movement(db_session, admin_user, "Ladrillo")
     waste = _history_movement(
         db_session, admin_user, "Arena", reason="merma", price=None
@@ -1746,7 +1747,7 @@ def test_the_admin_can_correct_any_salida_from_its_card(
     assert 'class="k-mcard__billing"' in waste_card
     assert f"/movements/{waste.id}/billing" in waste_card
     assert "k-mcard__amount" not in waste_card
-    assert "k-mcard__billing" not in _card(html, "Cemento")
+    assert "/billing" not in _card(html, "Cemento")
 
 
 def test_the_operario_never_sees_corregir_cobro_on_a_card(
@@ -1759,7 +1760,7 @@ def test_the_operario_never_sees_corregir_cobro_on_a_card(
 
     sale = _card(html, "Ladrillo")
     assert "k-mcard__billing" in sale and "Corregir cobro" not in sale
-    assert "k-mcard__billing" not in _card(html, "Arena")
+    assert "Corregir cobro" not in _card(html, "Arena")
 
 
 def test_the_note_line_only_shows_when_there_is_a_note(

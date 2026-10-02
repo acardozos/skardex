@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Reversar movimiento — Simple Kardex{% endblock %}
+
+{% block content %}
+{% set unit = unit_labels.get(target.material.unit, target.material.unit) %}
+<main class="k-main">
+    <div class="k-formcard">
+        <div class="k-formhead">
+            <p class="k-eyebrow">Reverso</p>
+            <h1>Reversar movimiento</h1>
+        </div>
+
+        {% if error %}
+        <p class="k-banner k-banner--danger" id="reverse-error">{{ error }}</p>
+        {% endif %}
+
+        {#- The fixed line (spec 009, EARS-H1-04): what is being reversed. The
+            item, the type and the reason are not fields: they cannot change. -#}
+        <div class="k-card k-card--spaced">
+            <p class="k-note k-reverse__target" id="reverse-target">Reversa: {{ target | movement_ref }} del {{ target.movement_date.strftime('%d/%m/%Y') }}, {{ target.quantity | qty }} {{ unit }} (pendiente: {{ pending | qty }})</p>
+            <div class="k-facts">
+                <span class="k-label">Artículo</span><span class="k-strong">{{ target.material.name }}</span>
+                <span class="k-label">Registra</span><span id="reverse-kind">{{ "Entrada" if reversal_type == "entrada" else "Salida" }} · Reverso</span>
+            </div>
+        </div>
+
+        {% if show_form %}
+        <form class="k-form" method="post" action="/movements/{{ target.id }}/reverse">
+            <input type="hidden" name="next" value="{{ return_page }}">
+            <div class="k-form__row">
+                <div class="k-field">
+                    <label class="k-label" for="quantity">Cantidad a reversar ({{ unit }})</label>
+                    <input class="k-input" type="number" step="0.001" min="0.001" max="{{ pending_input }}" id="quantity" name="quantity" required value="{{ form.get('quantity', '') }}">
+                    <span class="k-help">Todo lo pendiente; puedes bajarla para un reverso parcial.</span>
+                </div>
+                <div class="k-field">
+                    <label class="k-label" for="movement_date">Fecha</label>
+                    <input class="k-input" type="date" min="{{ target.movement_date.isoformat() }}" id="movement_date" name="movement_date" required value="{{ form.get('movement_date', '') }}">
+                </div>
+            </div>
+            <div class="k-field">
+                <label class="k-label" for="note">Observación (opcional)</label>
+                <textarea class="k-textarea" id="note" name="note" rows="2" maxlength="500" placeholder="Por qué se reversa">{{ form.get("note", "") }}</textarea>
+            </div>
+            <div class="k-form__actions">
+                <button type="submit" class="k-btn k-btn--primary">Registrar reverso</button>
+                <a class="k-btn k-btn--ghost" href="{{ return_page }}">Cancelar</a>
+            </div>
+        </form>
+        {% else %}
+        <div class="k-form__actions">
+            <a class="k-btn k-btn--ghost" href="{{ return_page }}">Volver</a>
+        </div>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}

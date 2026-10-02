@@ -127,6 +127,7 @@ def test_no_screen_shows_the_old_word_to_the_admin(
         "/movements",
         "/movements/new",
         f"/movements/{sale.id}/billing",
+        f"/movements/{sale.id}/reverse",
         "/payments?estado=pendientes",
         "/payments?estado=pagados",
         "/payments?estado=todos",
@@ -142,14 +143,20 @@ def test_no_screen_shows_the_old_word_to_the_admin(
 
 
 def test_no_screen_shows_the_old_word_to_the_operario(
-    operario_client: TestClient, catalog: Material
+    operario_client: TestClient, catalog: Material, db_session: Session
 ) -> None:
-    """EARS-H11-01"""
+    """EARS-H11-01; the reverse screen of a compra (spec 009) and of a sale,
+    which the operario is refused."""
+    compra = db_session.query(Movement).filter_by(reason="compra").one()
+    sale = db_session.query(Movement).filter_by(reason="venta").first()
+    assert sale is not None
     for page in [
         "/",
         "/materials",
         "/movements",
         "/movements/new",
+        f"/movements/{compra.id}/reverse",
+        f"/movements/{sale.id}/reverse",
         "/payments",
         "/account/password",
         "/users",

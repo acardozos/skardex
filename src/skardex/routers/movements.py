@@ -1,4 +1,5 @@
 from datetime import date as date_type
+from decimal import Decimal
 
 from fastapi import (
     APIRouter,
@@ -18,6 +19,8 @@ from skardex.constants import BILLING_REASONS
 from skardex.db import get_db
 from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.money import InvalidMoneyError, parse_money
+from skardex.movement_refs import of_ref
+from skardex.notices import pop_notice, set_notice
 from skardex.pagination import (
     PER_PAGE_COOKIE,
     build_url,
@@ -50,9 +53,24 @@ from skardex.services.kardex_service import (
     parse_quantity,
     register_movement,
 )
+from skardex.services.reversal_service import (
+    MovementNotFoundError,
+    ReversalBlock,
+    ReversalBlockedError,
+    ReversalDateError,
+    ReversalQuantityError,
+    chain_root,
+    register_reversal,
+    related_query,
+    reversal_block,
+    reversal_type_for,
+)
 from skardex.templating import templates
 
 router = APIRouter(prefix="/movements")
+
+# Set by a saved reversal, read by the history it redirects to.
+REVERSAL_NOTICE_SESSION_KEY = "reversal_notice"
 
 
 def _error_message(exc: Exception) -> str:
@@ -79,7 +97,45 @@ def _error_message(exc: Exception) -> str:
         )
     if isinstance(exc, NotPaidError):
         return "Esta venta no estaba pagada."
+    if isinstance(exc, ReversalBlockedError):
+        return _BLOCK_MESSAGES[exc.block]
+    if isinstance(exc, ReversalQuantityError):
+        return (
+            "La cantidad supera lo pendiente de reversar "
+            f"(pendiente: {format_quantity(exc.pending)})."
+        )
+    if isinstance(exc, ReversalDateError):
+        return (
+            "La fecha no puede ser anterior a la del movimiento que se reversa "
+            f"({exc.earliest.strftime('%d/%m/%Y')})."
+        )
     return "La fecha ingresada no es válida."
+
+
+# Why the reverse screen cannot be used, for the GET; a POST gets the same
+# text through `_error_message`. An inactive item keeps its usual message.
+_BLOCK_MESSAGES = {
+    ReversalBlock.SECOND_LEVEL: (
+        "Este movimiento es el reverso de un reverso, y no se puede reversar. "
+        "Si estuvo mal, el reverso original estaba bien: regístralo de nuevo."
+    ),
+    ReversalBlock.NOT_ALLOWED: (
+        "Solo el administrador puede reversar ventas, ajustes por conteo y "
+        "sus reversos."
+    ),
+    ReversalBlock.PAID_SALE: (
+        "La venta está pagada: para reversar, primero deshaz el pago en "
+        "«Corregir cobro»."
+    ),
+    ReversalBlock.INACTIVE: "El artículo seleccionado no es válido.",
+    ReversalBlock.NOTHING_PENDING: "Este movimiento ya está reversado del todo.",
+}
+
+
+def _block_status(block: ReversalBlock) -> int:
+    if block == ReversalBlock.NOT_ALLOWED:
+        return status.HTTP_403_FORBIDDEN
+    return status.HTTP_400_BAD_REQUEST
 
 
 _VALID_TYPES = {"entrada", "salida"}
@@ -103,6 +159,7 @@ def list_movements(
     material_id: str = "",
     type_filter: str = Query("", alias="type"),
     cobro: str = "",
+    rel: str = "",
     page: str = "",
     per_page: str = "",
 ) -> Response:
@@ -117,9 +174,19 @@ def list_movements(
     # The only supported value is "sin_precio"; anything else means no filter.
     selected_cobro = cobro if cobro in _VALID_COBROS else ""
 
+    # A movement's chain (spec 009): it narrows the list like any other filter.
+    # An id that does not exist, or is not a number, is ignored.
+    rel_movement = db.get(Movement, int(rel)) if rel.isdigit() else None
+    related_root = chain_root(rel_movement) if rel_movement is not None else None
+    related = related_query(db, related_root.id) if related_root is not None else None
+
     # `id` breaks ties so a row never hops between pages from one load to the next.
-    query = db.query(Movement).order_by(
-        Movement.movement_date.desc(), Movement.id.desc()
+    query = (
+        related
+        if related is not None
+        else db.query(Movement).order_by(
+            Movement.movement_date.desc(), Movement.id.desc()
+        )
     )
     if selected_material_id is not None:
         query = query.filter(Movement.material_id == selected_material_id)
@@ -138,6 +205,7 @@ def list_movements(
         "material_id": str(selected_material_id) if selected_material_id else "",
         "type": selected_type,
         "cobro": selected_cobro,
+        "rel": str(related_root.id) if related_root else "",
     }
     response = templates.TemplateResponse(
         request,
@@ -154,6 +222,11 @@ def list_movements(
             "selected_material_id": selected_material_id,
             "selected_type": selected_type,
             "selected_cobro": selected_cobro,
+            "related_root": related_root,
+            # One answer per row for the "Reversar" button or its notice,
+            # the same the server gives (`reversal_block`).
+            "reversal_blocks": {m.id: reversal_block(user, m) for m in shown.items},
+            "notice": pop_notice(request, REVERSAL_NOTICE_SESSION_KEY),
         },
     )
     remember_per_page(response, per_page)
@@ -403,3 +476,142 @@ def undo_movement_payment(
         )
 
     return RedirectResponse(url=destination, status_code=status.HTTP_303_SEE_OTHER)
+
+
+# --- reversal (spec 009) ----------------------------------------------------
+
+
+def _plain_quantity(value: Decimal) -> str:
+    """A quantity as an <input type="number"> takes it: "10", "2.5"."""
+    return f"{value.normalize():f}"
+
+
+def _reverse_response(
+    request: Request,
+    user: User,
+    target: Movement,
+    *,
+    return_page: str,
+    error: str | None = None,
+    form: dict[str, str] | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> Response:
+    """The reverse screen. Without a form (a blocked movement) it only shows
+    why, with a way back: there is nothing to fill in."""
+    block = reversal_block(user, target)
+    pending = target.remaining
+    if form is None and block is None:
+        form = {
+            "quantity": _plain_quantity(pending),
+            "movement_date": today().isoformat(),
+            "note": "",
+        }
+    return templates.TemplateResponse(
+        request,
+        "movements/reverse.html",
+        {
+            "target": target,
+            "reversal_type": reversal_type_for(target),
+            "pending": pending,
+            "pending_input": _plain_quantity(pending),
+            "show_form": block is None,
+            "error": error,
+            "form": form or {},
+            "return_page": return_page,
+        },
+        status_code=status_code,
+    )
+
+
+def _movement_or_404(db: Session, movement_id: int) -> Movement:
+    movement = db.get(Movement, movement_id)
+    if movement is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return movement
+
+
+@router.get("/{movement_id}/reverse")
+def reverse_form(
+    movement_id: int,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+    return_page: str = Query("", alias="next"),
+) -> Response:
+    target = _movement_or_404(db, movement_id)
+    destination = safe_return_url(return_page)
+
+    block = reversal_block(user, target)
+    if block is not None:
+        return _reverse_response(
+            request,
+            user,
+            target,
+            return_page=destination,
+            error=_BLOCK_MESSAGES[block],
+            status_code=_block_status(block),
+        )
+    return _reverse_response(request, user, target, return_page=destination)
+
+
+@router.post("/{movement_id}/reverse")
+def reverse_movement(
+    movement_id: int,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+    quantity: str = Form(""),
+    movement_date: str = Form(""),
+    note: str = Form(""),
+    return_page: str = Form("", alias="next"),
+) -> Response:
+    # The item, the type and the reason are not read from the form: they come
+    # from the movement being reversed and from the rules table.
+    target = _movement_or_404(db, movement_id)
+    destination = safe_return_url(return_page)
+
+    try:
+        reversal = register_reversal(
+            db,
+            target_id=target.id,
+            quantity=quantity,
+            movement_date=date_type.fromisoformat(movement_date),
+            note=note.strip() or None,
+            user=user,
+        )
+    except MovementNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from None
+    except (
+        ReversalBlockedError,
+        ReversalQuantityError,
+        ReversalDateError,
+        InvalidQuantityError,
+        InsufficientStockError,
+        InactiveMaterialError,
+        ValueError,
+    ) as exc:
+        return _reverse_response(
+            request,
+            user,
+            target,
+            return_page=destination,
+            error=_error_message(exc),
+            form={"quantity": quantity, "movement_date": movement_date, "note": note},
+            status_code=(
+                _block_status(exc.block)
+                if isinstance(exc, ReversalBlockedError)
+                else status.HTTP_400_BAD_REQUEST
+            ),
+        )
+
+    set_notice(
+        request,
+        REVERSAL_NOTICE_SESSION_KEY,
+        f"Reverso #{reversal.id} registrado: reversa "
+        f"{format_quantity(reversal.quantity)} {of_ref(target)}.",
+    )
+    root = chain_root(target)
+    return RedirectResponse(
+        url=build_url("/movements", {"rel": str(root.id)}),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )

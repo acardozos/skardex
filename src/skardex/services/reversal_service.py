@@ -6,7 +6,7 @@ import enum
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 
 from skardex.constants import COUNT_ADJUSTMENT_REASON, REVERSAL_REASON, SALE_REASON
 from skardex.models import Movement, MovementType, User, UserRole
@@ -74,7 +74,7 @@ def reversal_type_for(target: Movement) -> MovementType:
     raise NoReversalRuleError(target.type)
 
 
-def _root(movement: Movement) -> Movement:
+def chain_root(movement: Movement) -> Movement:
     """The first movement of the chain: two levels at most."""
     while movement.reverses is not None:
         movement = movement.reverses
@@ -91,12 +91,12 @@ def can_reverse(user: User, target: Movement) -> bool:
     adjustment, nor a reversal of either."""
     if user.role == UserRole.ADMIN:
         return True
-    return _root(target).reason not in _ADMIN_ONLY_ROOT_REASONS
+    return chain_root(target).reason not in _ADMIN_ONLY_ROOT_REASONS
 
 
 def _is_paid_sale(target: Movement) -> bool:
     """The sale itself, or the sale a reversal reverses (EARS-H3-07)."""
-    root = _root(target)
+    root = chain_root(target)
     return root.reason == SALE_REASON and root.paid_at is not None
 
 
@@ -174,14 +174,15 @@ def register_reversal(
     )
 
 
-def related_movements(db: Session, movement_id: int) -> list[Movement]:
+def related_query(db: Session, movement_id: int) -> Query[Movement] | None:
     """The chain a movement belongs to: its root, the root's reversals and
-    theirs, ordered like the history. Empty if it does not exist."""
+    theirs, ordered like the history; None if it does not exist. A query, so
+    the history can filter and page it like any other."""
     movement = db.get(Movement, movement_id)
     if movement is None:
-        return []
+        return None
 
-    root = _root(movement)
+    root = chain_root(movement)
     chain_ids = [root.id]
     level_ids = [root.id]
     for _ in range(2):
@@ -197,5 +198,10 @@ def related_movements(db: Session, movement_id: int) -> list[Movement]:
         db.query(Movement)
         .filter(Movement.id.in_(chain_ids))
         .order_by(Movement.movement_date.desc(), Movement.id.desc())
-        .all()
     )
+
+
+def related_movements(db: Session, movement_id: int) -> list[Movement]:
+    """`related_query`, all of it; empty if the movement does not exist."""
+    query = related_query(db, movement_id)
+    return query.all() if query is not None else []

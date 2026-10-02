@@ -21,6 +21,7 @@
         <form method="get" action="/movements">
             <input type="hidden" name="type" value="{{ selected_type }}">
             <input type="hidden" name="cobro" value="{{ selected_cobro }}">
+            <input type="hidden" name="rel" value="{{ params.rel }}">
             <select class="k-select" name="material_id" onchange="this.form.submit()">
                 <option value="">Todos los artículos</option>
                 {% for material in materials %}
@@ -47,6 +48,7 @@
     <details class="k-filters">
         <summary class="k-btn k-btn--ghost k-filters__toggle">Filtros{% if active_count %} · {{ active_count }}{% endif %}</summary>
         <form class="k-filters__panel" method="get" action="/movements">
+            <input type="hidden" name="rel" value="{{ params.rel }}">
             <div class="k-field">
                 <label class="k-label" for="filter-material">Artículo</label>
                 <select class="k-select" id="filter-material" name="material_id">
@@ -89,18 +91,42 @@
     </div>
     {% endif %}
 
+    {% if related_root %}
+    <div class="k-filter-chips k-filter-chips--always" id="related-filter">
+        <a class="k-filter-chip" href="{{ page_url('/movements', params, rel=None) }}" aria-label="Quitar filtro: relacionados con {{ related_root | with_article }}">Relacionados con {{ related_root | with_article }} ✕</a>
+    </div>
+    {% endif %}
+
+    {% if notice %}
+    <p class="k-banner k-banner--ok" id="reversal-notice">{{ notice }}</p>
+    {% endif %}
+
     {{ pager_summary(pg, "/movements", params) }}
 
-    {#- "Corregir cobro" for a movement, the same in the table and in its card:
-        the admin gets it on every salida (it can turn one into a sale) but a
-        Reverso or a count adjustment, never on an entrada; the operario
-        never. -#}
-    {% macro fix_link(movement, is_admin, here) -%}
-    {% if is_admin and can_fix_billing(movement) %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
+    {#- A movement's actions, the same in the table and in its card.
+        "Corregir cobro": the admin gets it on every salida (it can turn one
+        into a sale) but a Reverso or a count adjustment, never on an
+        entrada; the operario never. "Reversar": whenever `reversal_block`
+        (the server's own answer) lets this user; on a paid sale, or the
+        Reverso of one, the admin gets why not instead (spec 009). -#}
+    {% macro actions(movement, is_admin, here, block) -%}
+    {% set fix = is_admin and can_fix_billing(movement) %}
+    {% if fix or block is none or block == ReversalBlock.PAID_SALE %}
+    <span class="k-actions">
+        {%- if fix %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
+        {%- if block is none %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/reverse?next={{ here | urlencode }}">Reversar</a>
+        {%- elif block == ReversalBlock.PAID_SALE %}
+        {%- set sale = chain_root(movement) %}
+        {%- if sale.id == movement.id %}<span class="k-actions__hint">Para reversar, primero deshaz el pago.</span>
+        {%- else %}<span class="k-actions__hint">Para reversar, primero deshaz el pago <a href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">{{ sale | of_ref }}</a>.</span>
+        {%- endif %}
+        {%- endif -%}
+    </span>
+    {% endif %}
     {%- endmacro %}
 
     <div class="k-card">
-        {#- Desktop: the real table, all 10 columns. Touch screens and narrow
+        {#- Desktop: the real table, all 11 columns. Touch screens and narrow
             windows get the cards below instead (spec 007, H2). -#}
         <p class="k-scroll__hint" id="movements-hint" hidden>Desliza para ver más columnas →</p>
         <div class="k-scroll" id="movements-scroll">
@@ -117,11 +143,11 @@
                     <th>Cobro</th>
                     <th>Usuario</th>
                     <th>Observación</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for movement in movements %}
-                {% set fix = fix_link(movement, is_admin, here) %}
                 <tr>
                     <td class="k-dim">{{ movement.movement_date.strftime('%d/%m/%Y') }}</td>
                     <td class="k-strong">{{ movement.material.name }}</td>
@@ -134,20 +160,22 @@
                     {% if movement.reason == "venta" and movement.unit_price is none %}
                     <td class="k-num"><span class="k-tag k-tag--warn">Sin precio</span></td>
                     <td class="k-num k-dim">-</td>
-                    <td class="k-dim">{{ fix or "-" }}</td>
+                    <td class="k-dim">-</td>
                     {% elif movement.reason == "venta" %}
                     <td class="k-num">{{ movement.unit_price | cop }}</td>
                     <td class="k-num k-strong">{{ movement.amount | cop }}</td>
                     <td>
-                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %} {{ fix }}
+                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
                     </td>
                     {% else %}
                     <td class="k-num k-dim">-</td>
                     <td class="k-num k-dim">-</td>
-                    <td class="k-dim">{{ fix or "-" }}</td>
+                    <td class="k-dim">-</td>
                     {% endif %}
                     <td class="k-dim">{{ movement.user.username }}</td>
                     <td class="k-dim">{{ movement.note or "-" }}</td>
+                    {% set acts = actions(movement, is_admin, here, reversal_blocks[movement.id]) | trim %}
+                    <td class="k-dim">{{ acts or "-" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -159,10 +187,10 @@
             type (Traslado, spec 009) adds a branch instead of a redesign. -#}
         <ul class="k-mcards" id="movements-cards">
             {% for movement in movements %}
-            {% set fix = fix_link(movement, is_admin, here) %}
+            {% set acts = actions(movement, is_admin, here, reversal_blocks[movement.id]) | trim %}
             {% set is_sale = movement.reason == "venta" %}
             {% set qty_class = "k-mcard__qty--in" if movement.type == "entrada" else "" %}
-            {% set has_billing_line = is_sale or fix %}
+            {% set has_billing_line = is_sale or acts %}
             <li class="k-mcard">
                 <div class="k-mcard__main">
                     <span class="k-strong">{{ movement.material.name }}</span>
@@ -185,7 +213,7 @@
                         {%- endif -%}
                     </span>
                     {% endif %}
-                    {{ fix }}
+                    {{ acts }}
                 </div>
                 {% endif %}
                 {% if movement.note %}
@@ -198,7 +226,7 @@
         {% if not movements %}
         <div class="k-empty">
             <span class="k-empty__icon">🗒️</span>
-            {% if selected_material_id or selected_type or selected_cobro %}
+            {% if selected_material_id or selected_type or selected_cobro or related_root %}
             <h3>Sin resultados</h3>
             <p>Ningún movimiento coincide con ese filtro.</p>
             {% else %}

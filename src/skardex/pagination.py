@@ -138,7 +138,7 @@ def build_url(
 # parameters each of those lists understands. A fixed table on purpose:
 # redirecting to whatever a query string says would be an open redirect.
 _RETURN_PAGES: dict[str, tuple[str, ...]] = {
-    "/movements": ("material_id", "type", "cobro", "page", "per_page"),
+    "/movements": ("material_id", "type", "cobro", "rel", "page", "per_page"),
     "/payments": ("estado", "page", "per_page"),
 }
 DEFAULT_RETURN_URL = "/movements"

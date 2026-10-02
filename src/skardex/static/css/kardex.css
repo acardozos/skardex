@@ -358,6 +358,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 /* Read-only facts of one record (Corregir cobro): label | value pairs. */
 .k-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;padding:16px 20px}
 .k-card--spaced{margin-bottom:20px}
+/* The fixed line of the reverse screen, above its facts (spec 009). */
+.k-reverse__target{padding:16px 20px 0;color:var(--text)}
 /* A value shown once that the reader has to copy now (temporary password). */
 .k-secret p{margin:0 0 6px}
 .k-secret p:last-child{margin:0}
@@ -399,8 +401,9 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .k-table--wide td:first-child{background:var(--surface)}
 
 /* One card per movement on touch screens and below 1024px: item and
-   quantity; date · reason · user; the billing line (sales, and the admin's
-   "Corregir cobro"); the note if there is one. No field labels. */
+   quantity; date · reason · user; the billing line (a sale's amount, and
+   the actions: "Corregir cobro", "Reversar"); the note if there is one. No
+   field labels. */
 .k-mcards{display:none;margin:0;padding:0;list-style:none}
 .k-mcard{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-bottom:1px solid var(--border)}
 .k-mcard .k-strong{font-weight:500}
@@ -441,6 +444,14 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 @media (pointer:coarse){
   .k-check,.k-filter-chip{min-height:44px}
 }
+/* The related-movements filter (spec 009) has no control in the desktop
+   toolbar, so its removable tag shows at every width. */
+.k-filter-chips--always{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+
+/* A movement's actions, the same in the table and in its card: "Corregir
+   cobro", "Reversar", or why it cannot be reversed yet (spec 009). */
+.k-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.k-actions__hint{font-size:13px;color:var(--muted)}
 
 /* ---------- Pagos: touch selection and fixed pay bar (spec 007, H3) ---------- */
 /* A money KPI shrinks its figure to fit its own card, not the screen: the
