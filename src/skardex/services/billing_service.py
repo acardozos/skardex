@@ -6,13 +6,26 @@ from sqlalchemy import ColumnElement
 from sqlalchemy.orm import Query, Session
 
 from skardex.clock import today
-from skardex.constants import SALE_REASON, SALIDA_REASONS
+from skardex.constants import (
+    BILLING_REASONS,
+    COUNT_ADJUSTMENT_REASON,
+    REVERSAL_REASON,
+    SALE_REASON,
+)
 from skardex.models import Material, Movement, MovementType, User
+
+# Salidas that "Corregir cobro" never reclassifies: a mistake in one of them
+# is reversed and registered again (spec 009, EARS-H5-10).
+_NOT_RECLASSIFIABLE_REASONS = (REVERSAL_REASON, COUNT_ADJUSTMENT_REASON)
 
 
 class InvalidReasonError(Exception):
     """Raised when a movement has no reason, or one outside the fixed list
-    for its type (SALIDA_REASONS here; ENTRADA_REASONS in kardex_service)."""
+    for its screen (BILLING_REASONS here; the form lists in kardex_service)."""
+
+
+class NotReclassifiableError(Exception):
+    """Raised when correcting the billing of a Reverso or a count adjustment."""
 
 
 class InvalidPriceError(Exception):
@@ -57,7 +70,7 @@ def billing_fields_for(
     without price" for the admin to fix later, so registering it is never
     blocked waiting for the admin.
     """
-    if reason not in SALIDA_REASONS:
+    if reason not in BILLING_REASONS:
         raise InvalidReasonError(reason)
 
     if reason != SALE_REASON:
@@ -77,6 +90,15 @@ def billing_fields_for(
     if reference is not None and reference > 0:
         return reason, reference
     return reason, None
+
+
+def can_fix_billing(movement: Movement) -> bool:
+    """Whether "Corregir cobro" applies: any salida but a Reverso or a count
+    adjustment. Shared by the history's button, the route and the service."""
+    return (
+        movement.type == MovementType.SALIDA
+        and movement.reason not in _NOT_RECLASSIFIABLE_REASONS
+    )
 
 
 def _is_pending_sale(movement: Movement) -> bool:
@@ -193,6 +215,8 @@ def update_billing(
     """
     if movement.type != MovementType.SALIDA:
         raise NotASalidaError()
+    if not can_fix_billing(movement):
+        raise NotReclassifiableError()
     if movement.paid_at is not None:
         raise PaidMovementError()
 

@@ -92,10 +92,11 @@
     {{ pager_summary(pg, "/movements", params) }}
 
     {#- "Corregir cobro" for a movement, the same in the table and in its card:
-        the admin gets it on every salida (it can turn one into a sale), never
-        on an entrada; the operario never. -#}
+        the admin gets it on every salida (it can turn one into a sale) but a
+        Reverso or a count adjustment, never on an entrada; the operario
+        never. -#}
     {% macro fix_link(movement, is_admin, here) -%}
-    {% if is_admin and movement.type == "salida" %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
+    {% if is_admin and can_fix_billing(movement) %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
     {%- endmacro %}
 
     <div class="k-card">

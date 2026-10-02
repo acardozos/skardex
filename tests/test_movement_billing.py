@@ -236,21 +236,21 @@ def test_changing_a_sale_to_another_reason_removes_its_price(
     assert count_unpriced_sales(db_session) == 0
 
 
-def test_corregir_cobro_offers_ajuste_and_can_save_it(
+def test_corregir_cobro_no_longer_offers_ajuste_and_rejects_it(
     admin_client: TestClient, admin_user: User, make_sale: MakeSale, db_session: Session
 ) -> None:
-    """EARS-H2-01, EARS-H2-03 (spec 006)."""
+    """EARS-H2-03 (spec 006), changed by spec 009: EARS-H5-06, EARS-H5-07."""
     sale = make_sale("Una", user=admin_user, price="1000")
 
     html = admin_client.get(f"/movements/{sale.id}/billing").text
-    assert '<option value="ajuste"' in html
+    assert '<option value="ajuste"' not in html
 
     response = _post(admin_client, sale, "ajuste")
 
-    assert response.status_code == 303
+    assert response.status_code == 400
     db_session.refresh(sale)
-    assert sale.reason == "ajuste"
-    assert sale.unit_price is None
+    assert sale.reason == "venta"
+    assert sale.unit_price == Decimal("1000")
 
 
 def test_corregir_cobro_does_not_offer_entrada_only_reasons(

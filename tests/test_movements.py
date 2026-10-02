@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from sqlalchemy.orm import Session
 
-from skardex.constants import ENTRADA_REASONS, SALIDA_REASONS
+from skardex.constants import ADMIN_ONLY_REASONS, ENTRADA_REASONS, SALIDA_REASONS
 from skardex.models import Material, Movement, MovementType, User
 from skardex.services.kardex_service import get_balance
 
@@ -39,7 +39,10 @@ def test_movements_list_with_garbage_material_id_ignores_filter(
     assert response.status_code == 200
 
 
-@pytest.mark.parametrize("reason", list(ENTRADA_REASONS))
+# The admin-only ones ("conteo") are tested by role in test_movement_reasons.py.
+@pytest.mark.parametrize(
+    "reason", [r for r in ENTRADA_REASONS if r not in ADMIN_ONLY_REASONS]
+)
 def test_register_an_entrada_with_each_valid_reason(
     operario_client: TestClient, material: Material, db_session: Session, reason: str
 ) -> None:
@@ -524,19 +527,20 @@ def _last_movement(db: Session) -> Movement:
     return db.query(Movement).order_by(Movement.id.desc()).first()  # type: ignore[return-value]
 
 
-def test_form_offers_every_entrada_and_salida_reason_to_both_roles(
+def test_form_offers_the_entrada_and_salida_reasons_to_both_roles(
     admin_client: TestClient, operario_client: TestClient
 ) -> None:
-    """EARS-H2-01 (spec 004); EARS-H1-01 presentation (spec 006)."""
+    """EARS-H2-01 (spec 004); EARS-H1-01 presentation (spec 006). The
+    admin-only ones are tested by role in test_movement_reasons.py."""
     for client in (admin_client, operario_client):
         html = client.get("/movements/new").text
         assert 'name="reason"' in html
-        for key, label in SALIDA_REASONS.items():
-            assert f'<option value="{key}"' in html
-            assert f">{label}</option>" in html
-        for key, label in ENTRADA_REASONS.items():
-            assert f'<option value="{key}"' in html
-            assert f">{label}</option>" in html
+        for reasons in (SALIDA_REASONS, ENTRADA_REASONS):
+            for key, label in reasons.items():
+                if key in ADMIN_ONLY_REASONS:
+                    continue
+                assert f'<option value="{key}"' in html
+                assert f">{label}</option>" in html
 
 
 def _entrada_select(html: str) -> str:
@@ -580,7 +584,7 @@ def test_a_rejected_entrada_keeps_the_reason_that_was_chosen_not_the_default(
         data={
             "material_id": str(material.id),
             "movement_type": "entrada",
-            "reason": "ajuste",
+            "reason": "devolucion",
             "quantity": "0",  # invalid on purpose, to force a 400 redisplay
             "movement_date": "2026-01-15",
             "note": "",
@@ -588,7 +592,7 @@ def test_a_rejected_entrada_keeps_the_reason_that_was_chosen_not_the_default(
     )
 
     assert response.status_code == 400
-    assert '<option value="ajuste" selected>' in _entrada_select(response.text)
+    assert '<option value="devolucion" selected>' in _entrada_select(response.text)
     assert '<option value="compra" selected>' not in _entrada_select(response.text)
 
 
@@ -769,7 +773,9 @@ def test_a_sale_of_a_material_without_a_price_is_still_registered(
     assert sale.paid_at is None
 
 
-@pytest.mark.parametrize("reason", list(SALIDA_REASONS))
+@pytest.mark.parametrize(
+    "reason", [r for r in SALIDA_REASONS if r not in ADMIN_ONLY_REASONS]
+)
 def test_over_http_a_salida_larger_than_the_balance_is_rejected_with_any_reason(
     operario_client: TestClient,
     operario_user: User,

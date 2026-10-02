@@ -5,7 +5,14 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import ColumnElement, and_, case, func
 from sqlalchemy.orm import Session
 
-from skardex.constants import ADJUSTMENT_REASON, ENTRADA_REASONS
+from skardex.constants import (
+    ADJUSTMENT_REASON,
+    ADMIN_ONLY_REASONS,
+    ENTRADA_REASONS,
+    REVERSAL_REASON,
+    SALE_REASON,
+    SALIDA_REASONS,
+)
 from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.services.billing_service import InvalidReasonError, billing_fields_for
 
@@ -75,6 +82,24 @@ class InsufficientStockError(Exception):
     def __init__(self, available: Decimal) -> None:
         super().__init__(available)
         self.available = available
+
+
+class ReversalLinkError(Exception):
+    """Raised when a Reverso comes without a link, or a link without a Reverso."""
+
+
+class AdminOnlyReasonError(Exception):
+    """Raised when someone other than the admin uses an admin-only reason."""
+
+
+def offered_reasons(movement_type: MovementType, user: User) -> dict[str, str]:
+    """The reasons the movement form offers this user for this type."""
+    reasons = (
+        ENTRADA_REASONS if movement_type == MovementType.ENTRADA else SALIDA_REASONS
+    )
+    if user.role == UserRole.ADMIN:
+        return dict(reasons)
+    return {k: v for k, v in reasons.items() if k not in ADMIN_ONLY_REASONS}
 
 
 def _signed_quantity() -> object:
@@ -261,7 +286,14 @@ def register_movement(
     note: str | None,
     reason: str | None = None,
     unit_price: Decimal | None = None,
+    reverses_id: int | None = None,
 ) -> Movement:
+    """Register a movement after the rules every movement shares.
+
+    `reverses_id` is for the reversal service only, which checks the link
+    itself: no route passes it, so the normal form can never register a
+    Reverso. Without it, the reason must be one the form offers.
+    """
     if not material.is_active:
         raise InactiveMaterialError(material.id)
 
@@ -270,24 +302,34 @@ def register_movement(
     if not quantity.is_finite() or quantity <= 0:
         raise InvalidQuantityError(quantity)
 
-    # An entrada never has a price, even if someone sends one.
-    stored_reason: str | None = None
-    stored_price: Decimal | None = None
+    # A link always comes with a Reverso and a Reverso always with a link
+    # (spec 009): the database allows any reason, so this is the rule.
+    if (reverses_id is not None) != (reason == REVERSAL_REASON):
+        raise ReversalLinkError(reason)
+    if reverses_id is None:
+        accepted = (
+            ENTRADA_REASONS if movement_type == MovementType.ENTRADA else SALIDA_REASONS
+        )
+        if reason not in accepted:
+            raise InvalidReasonError(reason)
+    if reason in ADMIN_ONLY_REASONS and user.role != UserRole.ADMIN:
+        raise AdminOnlyReasonError(reason)
 
-    if movement_type == MovementType.SALIDA:
-        stored_reason, stored_price = billing_fields_for(
+    # Only a sale is charged: an entrada, a Reverso or a count adjustment
+    # never stores a price, even if someone sends one.
+    stored_price: Decimal | None = None
+    if movement_type == MovementType.SALIDA and reason == SALE_REASON:
+        _, stored_price = billing_fields_for(
             material,
             reason=reason,
             provided_price=unit_price,
             price_allowed=user.role == UserRole.ADMIN,
         )
+
+    if movement_type == MovementType.SALIDA:
         current_balance = get_balance(db, material.id)
         if quantity > current_balance:
             raise InsufficientStockError(current_balance)
-    else:
-        if reason not in ENTRADA_REASONS:
-            raise InvalidReasonError(reason)
-        stored_reason = reason
 
     movement = Movement(
         material_id=material.id,
@@ -296,8 +338,9 @@ def register_movement(
         quantity=quantity,
         movement_date=movement_date,
         note=note,
-        reason=stored_reason,
+        reason=reason,
         unit_price=stored_price,
+        reverses_id=reverses_id,
     )
     db.add(movement)
     db.commit()

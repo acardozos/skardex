@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from skardex.clock import today
-from skardex.constants import SALIDA_REASONS
+from skardex.constants import BILLING_REASONS, SALIDA_REASONS
 from skardex.models import Material, Movement, MovementType, User
 from skardex.services.billing_service import (
     EmptySelectionError,
@@ -32,6 +32,8 @@ from skardex.services.kardex_service import (
 )
 
 NON_SALE_REASONS = [key for key in SALIDA_REASONS if key != "venta"]
+# What "Corregir cobro" can turn a sale into: no "conteo" (spec 009).
+NON_SALE_BILLING_REASONS = [key for key in BILLING_REASONS if key != "venta"]
 
 
 def _material(sale_price: str | None) -> Material:
@@ -78,7 +80,7 @@ def test_a_missing_or_unknown_reason_is_rejected(reason: str | None) -> None:
         )
 
 
-@pytest.mark.parametrize("reason", NON_SALE_REASONS)
+@pytest.mark.parametrize("reason", NON_SALE_BILLING_REASONS)
 def test_only_sales_carry_a_price_even_if_one_is_sent(reason: str) -> None:
     """EARS-H2-12"""
     result = billing_fields_for(
@@ -789,7 +791,7 @@ def test_leaving_the_price_empty_on_a_sale_applies_the_reference_price(
     assert sale.unit_price == Decimal("1000.00")
 
 
-@pytest.mark.parametrize("new_reason", NON_SALE_REASONS)
+@pytest.mark.parametrize("new_reason", NON_SALE_BILLING_REASONS)
 def test_changing_a_sale_to_another_reason_removes_its_price(
     db_session: Session, admin_user: User, new_reason: str
 ) -> None:

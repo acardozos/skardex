@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
-from skardex.constants import ENTRADA_REASONS
+from skardex.constants import ADMIN_ONLY_REASONS, ENTRADA_REASONS
 from skardex.models import Material, MovementType, User
 from skardex.services.billing_service import InvalidReasonError
 from skardex.services.kardex_service import (
@@ -73,7 +73,10 @@ def _register_entrada(
     )
 
 
-@pytest.mark.parametrize("reason", list(ENTRADA_REASONS))
+# The admin-only ones ("conteo") are tested by role in test_movement_reasons.py.
+@pytest.mark.parametrize(
+    "reason", [r for r in ENTRADA_REASONS if r not in ADMIN_ONLY_REASONS]
+)
 def test_register_movement_accepts_every_entrada_reason(
     db_session: Session, material: Material, operario_user: User, reason: str
 ) -> None:

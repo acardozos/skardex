@@ -14,6 +14,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from skardex.clock import today
+from skardex.constants import BILLING_REASONS
 from skardex.db import get_db
 from skardex.models import Material, Movement, MovementType, User, UserRole
 from skardex.money import InvalidMoneyError, parse_money
@@ -33,15 +34,19 @@ from skardex.services.billing_service import (
     InvalidReasonError,
     NotPaidError,
     PaidMovementError,
+    can_fix_billing,
     undo_payment,
     unpriced_sale_conditions,
     update_billing,
 )
 from skardex.services.kardex_service import (
+    AdminOnlyReasonError,
     InactiveMaterialError,
     InsufficientStockError,
     InvalidQuantityError,
+    ReversalLinkError,
     get_balances_for_active_materials,
+    offered_reasons,
     parse_quantity,
     register_movement,
 )
@@ -59,6 +64,12 @@ def _error_message(exc: Exception) -> str:
         return "El artículo seleccionado no es válido."
     if isinstance(exc, InvalidReasonError):
         return "Indica el motivo del movimiento."
+    if isinstance(exc, ReversalLinkError):
+        return (
+            "Un reverso se registra con el botón «Reversar» del movimiento que corrige."
+        )
+    if isinstance(exc, AdminOnlyReasonError):
+        return "Solo el administrador registra un ajuste por conteo."
     if isinstance(exc, InvalidPriceError | InvalidMoneyError):
         return "El precio debe ser un número mayor a cero."
     if isinstance(exc, PaidMovementError):
@@ -170,6 +181,10 @@ def _form_response(
             "today": today().isoformat(),
             "form": form or {},
             "is_admin": user.role == UserRole.ADMIN,
+            # Each screen gets its own list: what is offered is not the same
+            # as what is valid, nor as what the history can label.
+            "entrada_reasons": offered_reasons(MovementType.ENTRADA, user),
+            "salida_reasons": offered_reasons(MovementType.SALIDA, user),
         },
         status_code=status_code,
     )
@@ -234,6 +249,8 @@ def create_movement(
         InvalidReasonError,
         InvalidPriceError,
         InvalidMoneyError,
+        ReversalLinkError,
+        AdminOnlyReasonError,
         ValueError,
     ) as exc:
         return _form_response(
@@ -250,7 +267,11 @@ def create_movement(
                 "reason": reason_value,
                 "unit_price": unit_price,
             },
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=(
+                status.HTTP_403_FORBIDDEN
+                if isinstance(exc, AdminOnlyReasonError)
+                else status.HTTP_400_BAD_REQUEST
+            ),
         )
 
     return RedirectResponse(url="/movements", status_code=status.HTTP_303_SEE_OTHER)
@@ -260,9 +281,10 @@ def create_movement(
 
 
 def _salida_or_404(db: Session, movement_id: int) -> Movement:
-    """Only a salida has billing; an entrada is treated as if it did not exist."""
+    """Only a salida has billing, and not a Reverso or a count adjustment
+    (EARS-H5-10): anything else is treated as if it did not exist."""
     movement = db.get(Movement, movement_id)
-    if movement is None or movement.type != MovementType.SALIDA:
+    if movement is None or not can_fix_billing(movement):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return movement
 
@@ -300,6 +322,7 @@ def _billing_response(
             "form": form,
             "reference_price": reference_price,
             "return_page": return_page,
+            "billing_reasons": BILLING_REASONS,
         },
         status_code=status_code,
     )
