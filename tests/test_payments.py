@@ -57,7 +57,7 @@ def test_pending_sales_are_listed_with_their_columns(
     table = _table(html, "sales-table")
 
     for header in (
-        "Fecha",
+        "N.º · Fecha",
         "Artículo",
         "Cantidad",
         "Precio unit.",

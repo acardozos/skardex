@@ -4,7 +4,7 @@
 {% block title %}Pendiente de pago — Simple Kardex{% endblock %}
 
 {% block content %}
-<main class="k-main">
+<main class="k-main k-main--wide">
     <div class="k-page-head">
         <div>
             <p class="k-eyebrow">Cobros</p>
@@ -66,8 +66,7 @@
                     {% if can_pay %}
                     <th><label class="k-pick"><input type="checkbox" id="select-all" data-select-all aria-label="Seleccionar todas" {% if all_checked %}checked{% endif %}></label></th>
                     {% endif %}
-                    <th>N.º</th>
-                    <th>Fecha</th>
+                    <th>N.º · Fecha</th>
                     <th>Artículo</th>
                     <th class="k-num">Cantidad</th>
                     <th class="k-num">Precio unit.</th>
@@ -86,8 +85,7 @@
                     {% if can_pay %}
                     <td><label class="k-pick"><input type="checkbox" name="movement_ids" value="{{ sale.id }}" data-amount="{{ sale.amount }}" aria-label="Incluir esta venta en el pago" {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></label></td>
                     {% endif %}
-                    <td class="k-dim">#{{ sale.id }}</td>
-                    <td class="k-dim">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
+                    <td class="k-dim"><span class="k-stack">#{{ sale.id }}</span><span class="k-stack">{{ sale.movement_date.strftime('%d/%m/%Y') }}</span></td>
                     <td class="k-strong">{{ sale.material.name }}</td>
                     {#- What is charged is what is left of the sale (spec 009): a
                         reversed part shows below it; reversed entirely, no amount. -#}

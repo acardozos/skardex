@@ -1655,7 +1655,8 @@ def _card(html: str, name: str) -> str:
 def test_movimientos_has_the_table_and_the_cards_on_a_wider_page(
     admin_client: TestClient, admin_user: User, db_session: Session
 ) -> None:
-    """EARS-H2-02, H2-04 — CSS shows one or the other; only this page is wider."""
+    """EARS-H2-02, H2-04 — CSS shows one or the other. The wide page is this
+    one's and, since spec 009 (task 8), Pagos'."""
     _history_movement(db_session, admin_user, "Cemento")
 
     html = admin_client.get("/movements").text
@@ -1663,7 +1664,8 @@ def test_movimientos_has_the_table_and_the_cards_on_a_wider_page(
     assert '<main class="k-main k-main--wide">' in html
     assert 'id="movements-table"' in html and 'id="movements-cards"' in html
     assert 'id="movements-hint" hidden' in html
-    for other in ("/", "/materials", "/payments", "/users"):
+    assert '<main class="k-main k-main--wide">' in admin_client.get("/payments").text
+    for other in ("/", "/materials", "/users"):
         assert "k-main--wide" not in admin_client.get(other).text, other
 
 

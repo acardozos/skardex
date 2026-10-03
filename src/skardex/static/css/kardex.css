@@ -388,10 +388,12 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 }
 
 /* ---------- Movimientos: wide table and compact cards (spec 007, H2) ---------- */
-/* Desktop keeps all 10 columns (the owner's call). A wider page than the
-   other ones lets the table fit whole on a common monitor; on a narrower
-   window the date column stays put while the rest scrolls, with a hint. */
-.k-main--wide{max-width:1280px}
+/* Desktop keeps its columns (the owner's call). The wide page (Movimientos,
+   and Pagos since spec 009) takes all the width the window has, with no cap:
+   if there is room, the table uses it instead of squeezing its text. On a
+   window too narrow for Movimientos, its first column (number and date)
+   stays put while the rest scrolls, with a hint. */
+.k-main--wide{max-width:none}
 .k-scroll{overflow-x:auto}
 .k-scroll__hint{margin:0;padding:10px 20px;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted)}
 /* `separate`, not `collapse`: sticky cells in collapsed tables misbehave in
@@ -457,6 +459,15 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
    history it is a link to the movement's chain. */
 .k-reversed-note{display:block;font-size:13px;color:var(--muted)}
 a.k-reversed-note{color:var(--accent)}
+/* In a table cell its parts stack, each whole, so the column stays narrow:
+   "Reversado" / "2,25 de 1.250,5", "reversa:" / "venta #4874". */
+td .k-reversed-note > span{display:block;white-space:nowrap}
+/* Two short data in one cell, one per line (the number over the date). */
+.k-stack{display:block;white-space:nowrap}
+/* In a table, a movement's buttons go one under the other. */
+td .k-actions{flex-direction:column;align-items:flex-start}
+/* An entrada's quantity in the history table, as in its card. */
+.k-qty--in{color:var(--ok)}
 
 /* ---------- Pagos: touch selection and fixed pay bar (spec 007, H3) ---------- */
 /* A money KPI shrinks its figure to fit its own card, not the screen: the

@@ -47,22 +47,29 @@ def test_no_template_uses_a_banner_without_a_meaning() -> None:
 def test_history_tags_entrada_green_salida_neutral_sin_precio_amber(
     admin_client: TestClient, admin_user: User, make_sale: MakeSale
 ) -> None:
-    """EARS-H6-03, H6-05, H6-06, H6-07"""
-    make_sale(
+    """EARS-H6-03, H6-05, H6-06, H6-07. Since spec 009 (task 8) the table has
+    no "Tipo" column: an entrada's quantity is green, as in its card, and a
+    salida's keeps the text colour."""
+    entrada = make_sale(
         "Arena",
         user=admin_user,
         movement_type=MovementType.ENTRADA,
         reason="compra",
         price=None,
     )
-    make_sale("Grava", user=admin_user, price=None)
+    salida = make_sale("Grava", user=admin_user, price=None)
     make_sale("Ladrillo", user=admin_user)
     make_sale("Varilla", user=admin_user, paid_on=date(2026, 9, 12))
 
     html = admin_client.get("/movements").text
 
-    assert _tag(html, "Entrada") == "k-tag k-tag--ok"
-    assert _tag(html, "Salida") == "k-tag k-tag--neutral"
+    table = html.split('id="movements-table"')[1].split("</table>")[0]
+    rows = {row.split("</td>")[0]: row for row in table.split("<tr")}
+    entrada_row = next(r for k, r in rows.items() if f"#{entrada.id}<" in k)
+    salida_row = next(r for k, r in rows.items() if f"#{salida.id}<" in k)
+    assert '<td class="k-num k-qty--in">+1 kg' in entrada_row
+    assert '<td class="k-num">−1 kg' in salida_row
+    assert 'k-tag--ok">Entrada' not in html
     assert _tag(html, "Sin precio") == "k-tag k-tag--warn"
     assert _tag(html, "Pagada") == "k-tag k-tag--ok"
     assert _tag(html, "Pendiente") == "k-tag"  # action blue, not an alarm
