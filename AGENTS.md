@@ -15,6 +15,14 @@ and business rules that aren't obvious from the code alone.
   `unit_price`, `paid_at`) can be corrected afterward, through the
   dedicated billing-correction flow (`services/billing_service.py`) — that
   correction never touches inventory quantities.
+- **A wrong movement is corrected with a linked Reverso**, never edited:
+  a movement with reason `reverso` and `reverses_id` pointing at it, in the
+  opposite direction, for all or part of it (`services/reversal_service.py`,
+  the only module that knows what a Reverso is). What was reversed is
+  computed on read (`Movement.reversed_quantity`, two levels), like the
+  balance; a sale is charged for what is left of it. Which type reverses
+  which lives only in `REVERSAL_RULES`. The old `ajuste` reason is legacy:
+  never offered nor accepted for new movements.
 - **Roles gate money, not just screens.** An operario can register
   movements but never sets or sees a purchase/sale price directly — see
   `billing_service.billing_fields_for`: a sale takes an admin-provided
