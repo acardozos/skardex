@@ -24,11 +24,16 @@ and business rules that aren't obvious from the code alone.
   which lives only in `REVERSAL_RULES`. The old `ajuste` reason is legacy:
   never offered nor accepted for new movements.
 - **Roles gate money, not just screens.** An operario can register
-  movements but never sets or sees a purchase/sale price directly — see
-  `billing_service.billing_fields_for`: a sale takes an admin-provided
-  price if given, otherwise falls back to the material's reference
-  `sale_price`, otherwise it's stored as an "unpriced sale" (never blocks
-  registering the movement).
+  movements but never sets a price, registers a payment or corrects
+  billing. In the movement form only the admin gets a price field
+  (prefilled with the reference price, editable for a special price); the
+  operario gets no field, just a note with the reference price, and any
+  price they send is ignored — see `billing_service.billing_fields_for`: a
+  sale takes an admin-provided price if given, otherwise falls back to the
+  material's reference `sale_price`, otherwise it's stored as an "unpriced
+  sale" (never blocks registering the movement). Viewing is not gated: the
+  operario sees prices, amounts and payment status in Movimientos and
+  Pagos, read-only.
 - **No public sign-up.** Only the admin creates operario accounts.
 
 ## Conventions
