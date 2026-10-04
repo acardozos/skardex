@@ -55,9 +55,10 @@ class Movement(Base):
         ),
         # A link (`reverses_id`) only says "this movement offsets that one";
         # which reasons may carry it is the reversal service's rule, so the
-        # schema never mentions a reason (spec 010 adds Traslado without a
-        # migration). The pair is already unique because `id` is; Postgres
-        # still needs it declared to be the target of a foreign key.
+        # schema never mentions a reason (the Bodega/Mostrador Traslado can
+        # carry it without a migration). The pair is already unique because
+        # `id` is; Postgres still needs it declared to be the target of a
+        # foreign key.
         UniqueConstraint("id", "material_id", name="uq_movements_id_material"),
         # Two columns, so a link can only point at a movement of the same
         # material. With `reverses_id` NULL the key is not checked.

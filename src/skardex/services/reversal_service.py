@@ -13,8 +13,8 @@ from skardex.models import Movement, MovementType, User, UserRole
 from skardex.services.kardex_service import parse_quantity, register_movement
 
 # Which movement type reverses which: {reversal type: reversed type}. The
-# one place that says "an entrada reverses a salida" (EARS-G-03); spec 010
-# adds Traslado here.
+# one place that says "an entrada reverses a salida" (EARS-G-03); the
+# Bodega/Mostrador Traslado will add its rule here.
 REVERSAL_RULES: dict[MovementType, MovementType] = {
     MovementType.ENTRADA: MovementType.SALIDA,
     MovementType.SALIDA: MovementType.ENTRADA,
