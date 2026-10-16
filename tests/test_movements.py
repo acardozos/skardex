@@ -1200,9 +1200,10 @@ def _add_history(
 
 def _rows(html: str) -> list[str]:
     """The notes of the rows shown, in display order. Only the desktop table:
-    since spec 007 each movement also has a card with the same note."""
+    since spec 007 each movement also has a card with the same note. Only the
+    cell's text: since spec 010 the note is also in its `title`."""
     table = html[html.index('id="movements-table"') : html.index("</table>")]
-    return re.findall(r"fila\d{3}", table)
+    return re.findall(r">(fila\d{3})<", table)
 
 
 def _links(html: str) -> list[str]:

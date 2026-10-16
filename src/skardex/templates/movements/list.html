@@ -108,7 +108,8 @@
         into a sale) but a Reverso or a count adjustment, never on an
         entrada; the operario never. "Reversar": whenever `reversal_block`
         (the server's own answer) lets this user; on a paid sale, or the
-        Reverso of one, the admin gets why not instead (spec 009). -#}
+        Reverso of one, the admin gets the button disabled and why underneath
+        (spec 010); every other block shows nothing. -#}
     {% macro actions(movement, is_admin, here, block) -%}
     {% set fix = is_admin and can_fix_billing(movement) %}
     {% if fix or block is none or block == ReversalBlock.PAID_SALE %}
@@ -116,27 +117,52 @@
         {%- if fix %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a>{% endif %}
         {%- if block is none %}<a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ movement.id }}/reverse?next={{ here | urlencode }}">Reversar</a>
         {%- elif block == ReversalBlock.PAID_SALE %}
-        {%- set sale = chain_root(movement) %}
-        {%- if sale.id == movement.id %}<span class="k-actions__hint">Para reversar, primero deshaz el pago.</span>
-        {%- else %}<span class="k-actions__hint">Para reversar, primero deshaz el pago <a href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">{{ sale | of_ref }}</a>.</span>
+        {%- set sale = chain_root(movement) %}<button type="button" class="k-btn k-btn--ghost k-btn--sm k-btn--blocked" disabled>Reversar</button>
+        {%- if sale.id == movement.id %}<span class="k-actions__hint">Primero deshaz el pago.</span>
+        {%- else %}<span class="k-actions__hint">Primero deshaz el pago <a href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">{{ sale | of_ref }}</a>.</span>
         {%- endif %}
         {%- endif -%}
     </span>
     {% endif %}
     {%- endmacro %}
 
-    {#- What was reversed of a movement, as a neutral label (spec 009, H4-02):
-        empty while nothing is. -#}
-    {#- Each part in its own span: in the table they stack in two lines, each
-        whole, so the column stays narrow (spec 009, task 8). -#}
+    {#- What was reversed of a movement, as a neutral label in one line (spec
+        009 H4-02, spec 010): empty while nothing is. -#}
     {% macro reversed_label(movement) -%}
-    {%- if movement.is_fully_reversed -%}<span>Reversado</span>
-    {%- elif movement.reversed_quantity -%}<span>Reversado</span> <span>{{ movement.reversed_quantity | qty }} de {{ movement.quantity | qty }}</span>
+    {%- if movement.is_fully_reversed -%}Reversado
+    {%- elif movement.reversed_quantity -%}Reversado {{ movement.reversed_quantity | qty }} de {{ movement.quantity | qty }}
+    {%- endif -%}
+    {%- endmacro %}
+
+    {#- A movement's reason; a Reverso names what it reverses, in one line,
+        with that part as a link to the chain: "Reverso de venta #4874",
+        "Reverso de reverso #4879" (spec 010). -#}
+    {% macro reason_text(movement, related_url) -%}
+    {%- if movement.reverses -%}Reverso de <a href="{{ related_url }}">{{ movement.reverses | movement_ref }}</a>
+    {%- elif movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
+    {%- else -%}Sin motivo
+    {%- endif -%}
+    {%- endmacro %}
+
+    {#- The "Venta" column (spec 010): one column instead of unit price,
+        amount and payment state, which only a sale has. -#}
+    {% macro sale_cell(movement) -%}
+    {%- if movement.reason != "venta" -%}<span class="k-dim">—</span>
+    {%- elif movement.unit_price is none and not movement.is_fully_reversed -%}<span class="k-tag k-tag--warn">Sin precio</span>
+    {%- else -%}
+    {%- if not movement.is_fully_reversed %}<span class="k-sale__amount">{{ movement.amount | cop }}</span>{% endif -%}
+    {%- if movement.unit_price is not none %}<span class="k-sale__unit">a {{ movement.unit_price | cop }} c/u</span>{% endif -%}
+    <span class="k-sale__state">
+        {%- if movement.is_fully_reversed -%}<span class="k-tag k-tag--neutral">Reversada</span>
+        {%- elif movement.paid_at -%}<span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span> <span class="k-tag k-tag--ok">Pagada</span>
+        {%- else -%}<span class="k-tag">Pendiente</span>
+        {%- endif -%}
+    </span>
     {%- endif -%}
     {%- endmacro %}
 
     <div class="k-card">
-        {#- Desktop: the real table, all 10 columns. Touch screens and narrow
+        {#- Desktop: the real table, all 8 columns. Touch screens and narrow
             windows get the cards below instead (spec 007, H2). -#}
         <p class="k-scroll__hint" id="movements-hint" hidden>Desliza para ver más columnas →</p>
         <div class="k-scroll" id="movements-scroll">
@@ -147,9 +173,7 @@
                     <th>Artículo</th>
                     <th class="k-num">Cantidad</th>
                     <th>Motivo</th>
-                    <th class="k-num">Precio unit.</th>
-                    <th class="k-num">Monto</th>
-                    <th>Cobro</th>
+                    <th class="k-num">Venta</th>
                     <th>Usuario</th>
                     <th>Observación</th>
                     <th>Acciones</th>
@@ -171,34 +195,16 @@
                     <td class="k-num{{ ' k-qty--in' if movement.type == 'entrada' else '' }}">{{ "+" if movement.type == "entrada" else "−" }}{{ movement.quantity | qty }} {{ unit_labels.get(movement.material.unit, movement.material.unit) }}
                         {%- if reversed %}<a class="k-reversed-note" href="{{ related_url }}">{{ reversed }}</a>{% endif -%}
                     </td>
-                    <td class="k-dim">
-                        {%- if movement.reason -%}{{ reason_labels.get(movement.reason, movement.reason) }}
-                        {%- else -%}Sin motivo{%- endif -%}
-                        {%- if movement.reverses %}<a class="k-reversed-note" href="{{ related_url }}"><span>reversa:</span> <span>{{ movement.reverses | movement_ref }}</span></a>{% endif -%}
-                    </td>
-                    {#- A sale reversed entirely is not charged, nor priced (spec 009,
-                        H3-02): the same "Reversada" Pagos shows, without amount. -#}
-                    {% if movement.reason == "venta" and movement.is_fully_reversed %}
-                    <td class="k-num k-dim">{{ movement.unit_price | cop if movement.unit_price is not none else "-" }}</td>
-                    <td class="k-num k-dim">-</td>
-                    <td><span class="k-tag k-tag--neutral">Reversada</span></td>
-                    {% elif movement.reason == "venta" and movement.unit_price is none %}
-                    <td class="k-num"><span class="k-tag k-tag--warn">Sin precio</span></td>
-                    <td class="k-num k-dim">-</td>
-                    <td class="k-dim">-</td>
-                    {% elif movement.reason == "venta" %}
-                    <td class="k-num">{{ movement.unit_price | cop }}</td>
-                    <td class="k-num k-strong">{{ movement.amount | cop }}</td>
-                    <td>
-                        {% if movement.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ movement.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
-                    </td>
-                    {% else %}
-                    <td class="k-num k-dim">-</td>
-                    <td class="k-num k-dim">-</td>
-                    <td class="k-dim">-</td>
-                    {% endif %}
-                    <td class="k-dim">{{ movement.user.username }}</td>
-                    <td class="k-dim">{{ movement.note or "-" }}</td>
+                    <td class="k-dim k-c-reason">{{ reason_text(movement, related_url) }}</td>
+                    {#- A sale reversed entirely is not charged (spec 009, H3-02):
+                        "Reversada", without amount. -#}
+                    <td class="k-num k-c-sale">{{ sale_cell(movement) }}</td>
+                    <td class="k-dim k-c-user" title="{{ movement.user.username }}">{{ movement.user.username }}</td>
+                    {%- if movement.note %}
+                    <td class="k-dim k-c-note" title="{{ movement.note }}">{{ movement.note }}</td>
+                    {%- else %}
+                    <td class="k-dim k-c-note">-</td>
+                    {%- endif %}
                     {% set acts = actions(movement, is_admin, here, reversal_blocks[movement.id]) | trim %}
                     <td class="k-dim">{{ acts or "-" }}</td>
                 </tr>
@@ -227,15 +233,13 @@
                     <span>#{{ movement.id }}</span>
                     {#- -#}
                     <span>{{ movement.movement_date.strftime('%d/%m/%Y') }}</span>
-                    {%- if movement.reason %}<span>{{ reason_labels.get(movement.reason, movement.reason) }}</span>{% else %}<span>Sin motivo</span>{% endif -%}
+                    {#- -#}
+                    <span>{{ reason_text(movement, related_url) }}</span>
+                    {#- -#}
                     <span>{{ movement.user.username }}</span>
                 </p>
-                {% if reversed or movement.reverses %}
-                {#- The spans touch on purpose: `.k-meta` puts the " · " between them. -#}
-                <p class="k-mcard__meta k-meta">
-                    {%- if movement.reverses %}<span><a href="{{ related_url }}">reversa: {{ movement.reverses | movement_ref }}</a></span>{% endif -%}
-                    {%- if reversed %}<span><a href="{{ related_url }}">{{ reversed }}</a></span>{% endif -%}
-                </p>
+                {% if reversed %}
+                <p class="k-mcard__meta k-meta"><span><a href="{{ related_url }}">{{ reversed }}</a></span></p>
                 {% endif %}
                 {% if has_billing_line %}
                 <div class="k-mcard__billing">

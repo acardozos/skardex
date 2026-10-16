@@ -14,6 +14,10 @@ from sqlalchemy.orm import Session
 from skardex.models import Material, Movement, MovementType, User
 
 MakeSale = Callable[..., Movement]
+BLOCKED_BUTTON = (
+    '<button type="button" class="k-btn k-btn--ghost k-btn--sm k-btn--blocked"'
+    " disabled>Reversar</button>"
+)
 TODAY = date(2026, 9, 25)
 
 
@@ -548,21 +552,26 @@ def test_a_paid_sale_shows_the_admin_why_instead_of_the_button(
     admin_user: User,
     make_sale: MakeSale,
 ) -> None:
-    """EARS-H1-03; the operario sees neither"""
+    """EARS-H1-03; since spec 010 (EARS-H1-12) the notice comes with the
+    "Reversar" button disabled, in the table and the card; the operario sees
+    neither."""
     paid = make_sale(user=admin_user, material=material, paid_on=date(2026, 9, 15))
 
     page = admin_client.get("/movements").text
     assert _reverse_links(page, paid) == 0
-    assert page.count("Para reversar, primero deshaz el pago.") == 2
+    assert page.count(BLOCKED_BUTTON) == 2
+    assert page.count("Primero deshaz el pago.") == 2
 
     page = operario_client.get("/movements").text
-    assert "Para reversar, primero deshaz el pago" not in page
+    assert BLOCKED_BUTTON not in page
+    assert "Primero deshaz el pago" not in page
 
 
 def test_the_reversal_of_a_paid_sale_points_to_the_sale(
     admin_client: TestClient, db_session: Session, sale: Movement, admin_user: User
 ) -> None:
-    """EARS-H3-07 (the same notice, with a link to the sale's "Corregir cobro")"""
+    """EARS-H3-07 (the same notice, with a link to the sale's "Corregir cobro");
+    with the disabled button since spec 010 (EARS-H1-12)."""
     reversal = _reversal_of(db_session, sale, admin_user, "2")
     sale.paid_at = date(2026, 9, 21)
     sale.paid_by_id = admin_user.id
@@ -571,7 +580,9 @@ def test_the_reversal_of_a_paid_sale_points_to_the_sale(
     page = admin_client.get("/movements").text
 
     assert _reverse_links(page, reversal) == 0
-    assert f'primero deshaz el pago <a href="/movements/{sale.id}/billing?next=' in page
+    # The paid sale and its Reverso, each in the table and in its card.
+    assert page.count(BLOCKED_BUTTON) == 4
+    assert f'Primero deshaz el pago <a href="/movements/{sale.id}/billing?next=' in page
     assert f">de la venta #{sale.id}</a>." in page
 
 

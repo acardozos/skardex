@@ -125,23 +125,20 @@ def test_a_partially_reversed_movement_shows_how_much_of_how_much(
     admin_client: TestClient, db_session: Session, sale: Movement, admin_user: User
 ) -> None:
     """EARS-H4-02, EARS-H4-04: the registered quantity stays, the label links
-    to the movement's chain."""
+    to the movement's chain; in one line since spec 010 (EARS-H1-11)."""
     _reverse(db_session, sale, admin_user, "2.5", "parte")
     page = admin_client.get("/movements").text
 
     label = (
         f'<a class="k-reversed-note" href="/movements?rel={sale.id}">'
-        "<span>Reversado</span> <span>2,5 de 10</span></a>"
+        "Reversado 2,5 de 10</a>"
     )
     row = _history_row(page, "la-venta")
     assert "−10 kg" in row
     assert label in row
     card = _history_card(page, "la-venta")
     assert "−10 kg" in card
-    assert (
-        f'<a href="/movements?rel={sale.id}">'
-        "<span>Reversado</span> <span>2,5 de 10</span></a>"
-    ) in card
+    assert f'<a href="/movements?rel={sale.id}">Reversado 2,5 de 10</a>' in card
 
 
 def test_a_fully_reversed_movement_shows_reversado(
@@ -152,12 +149,11 @@ def test_a_fully_reversed_movement_shows_reversado(
     page = admin_client.get("/movements").text
 
     assert (
-        f'<a class="k-reversed-note" href="/movements?rel={sale.id}">'
-        "<span>Reversado</span></a>" in _history_row(page, "la-venta")
+        f'<a class="k-reversed-note" href="/movements?rel={sale.id}">Reversado</a>'
+        in _history_row(page, "la-venta")
     )
-    assert (
-        f'<a href="/movements?rel={sale.id}"><span>Reversado</span></a>'
-        in _history_card(page, "la-venta")
+    assert f'<a href="/movements?rel={sale.id}">Reversado</a>' in _history_card(
+        page, "la-venta"
     )
 
 
@@ -179,12 +175,8 @@ def test_a_reversal_given_back_shows_what_is_still_reversed(
     _reverse(db_session, first, admin_user, "1", "devuelto")
     page = admin_client.get("/movements").text
 
-    assert "<span>Reversado</span> <span>3 de 10</span></a>" in _history_row(
-        page, "la-venta"
-    )
-    assert "<span>Reversado</span> <span>1 de 4</span></a>" in _history_row(
-        page, "primero"
-    )
+    assert ">Reversado 3 de 10</a>" in _history_row(page, "la-venta")
+    assert ">Reversado 1 de 4</a>" in _history_row(page, "primero")
 
 
 # --- What a Reverso reverses (H4-03, H4-04) ---------------------------------
@@ -193,32 +185,27 @@ def test_a_reversal_given_back_shows_what_is_still_reversed(
 def test_a_reverso_shows_what_it_reverses_with_its_number(
     admin_client: TestClient, db_session: Session, sale: Movement, admin_user: User
 ) -> None:
-    """EARS-H4-03, EARS-H4-04"""
+    """EARS-H4-03, EARS-H4-04; one line "Reverso de venta #N" since spec 010
+    (EARS-H1-09), in the table and the card."""
     _reverse(db_session, sale, admin_user, "2", "el-reverso")
     page = admin_client.get("/movements").text
 
-    row = _history_row(page, "el-reverso")
-    assert (
-        "Reverso"
-        f'<a class="k-reversed-note" href="/movements?rel={sale.id}">'
-        f"<span>reversa:</span> <span>venta #{sale.id}</span></a>"
-    ) in row
-    card = _history_card(page, "el-reverso")
-    assert "<span>Reverso</span>" in card
-    assert f'<a href="/movements?rel={sale.id}">reversa: venta #{sale.id}</a>' in card
+    expected = f'Reverso de <a href="/movements?rel={sale.id}">venta #{sale.id}</a>'
+    assert expected in _history_row(page, "el-reverso")
+    assert f"<span>{expected}</span>" in _history_card(page, "el-reverso")
 
 
 def test_a_reverso_of_a_reverso_links_to_the_original_chain(
     admin_client: TestClient, db_session: Session, sale: Movement, admin_user: User
 ) -> None:
-    """EARS-H4-03 (named by its reason, "reverso"), EARS-H4-04 (the root)"""
+    """EARS-H4-03 (named by its reason, "reverso"), EARS-H4-04 (the root);
+    "Reverso de reverso #N" since spec 010 (EARS-H1-10)."""
     first = _reverse(db_session, sale, admin_user, "4", "primero")
     _reverse(db_session, first, admin_user, "1", "segundo")
     page = admin_client.get("/movements").text
 
     assert (
-        f'<a class="k-reversed-note" href="/movements?rel={sale.id}">'
-        f"<span>reversa:</span> <span>reverso #{first.id}</span></a>"
+        f'Reverso de <a href="/movements?rel={sale.id}">reverso #{first.id}</a>'
     ) in _history_row(page, "segundo")
 
 
@@ -239,15 +226,15 @@ def test_a_reverso_of_an_entrada_is_named_by_its_reason(
     _reverse(db_session, otro, admin_user, "1", "rev-otro")
     page = admin_client.get("/movements").text
 
-    assert f"<span>compra #{compra.id}</span></a>" in _history_row(page, "rev-compra")
-    assert f"<span>entrada #{otro.id}</span></a>" in _history_row(page, "rev-otro")
+    assert f">compra #{compra.id}</a>" in _history_row(page, "rev-compra")
+    assert f">entrada #{otro.id}</a>" in _history_row(page, "rev-otro")
 
 
 def test_a_movement_that_reverses_nothing_has_no_reversa_line(
     admin_client: TestClient, sale: Movement
 ) -> None:
     """EARS-H4-03 (only on a Reverso)"""
-    assert "reversa:" not in admin_client.get("/movements").text
+    assert "Reverso de" not in admin_client.get("/movements").text
 
 
 # --- The legacy "Ajuste" (H4-07) --------------------------------------------

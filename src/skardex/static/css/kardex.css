@@ -454,20 +454,25 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
    cobro", "Reversar", or why it cannot be reversed yet (spec 009). */
 .k-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .k-actions__hint{font-size:13px;color:var(--muted)}
-/* A line under a quantity or a reason (spec 009): how much was reversed
-   (Pagos, Movimientos) and what a Reverso reverses (Movimientos). In the
-   history it is a link to the movement's chain. */
+/* A line under a quantity (spec 009): how much was reversed, in one line.
+   In the history it is a link to the movement's chain. */
 .k-reversed-note{display:block;font-size:13px;color:var(--muted)}
 a.k-reversed-note{color:var(--accent)}
-/* In a table cell its parts stack, each whole, so the column stays narrow:
-   "Reversado" / "2,25 de 1.250,5", "reversa:" / "venta #4874". */
-td .k-reversed-note > span{display:block;white-space:nowrap}
 /* Two short data in one cell, one per line (the number over the date). */
 .k-stack{display:block;white-space:nowrap}
 /* In a table, a movement's buttons go one under the other. */
 td .k-actions{flex-direction:column;align-items:flex-start}
 /* An entrada's quantity in the history table, as in its card. */
 .k-qty--in{color:var(--ok)}
+/* The "Venta" column of the history (spec 010): the amount, "a $ X c/u"
+   and the payment state, one per line, right-aligned like the numbers. */
+.k-c-sale > span{display:block}
+.k-sale__amount{font-weight:700;color:var(--text);white-space:nowrap}
+.k-sale__unit{font-size:13px;color:var(--muted);white-space:nowrap}
+.k-sale__state{margin-top:4px;white-space:nowrap}
+/* "Reversar" that cannot be used yet (a paid sale): visible, but plainly
+   not a button to press; the note underneath says why. */
+.k-btn--blocked,.k-btn--blocked:hover{border-style:dashed;opacity:.55;cursor:not-allowed;background:transparent}
 
 /* ---------- Pagos: touch selection and fixed pay bar (spec 007, H3) ---------- */
 /* A money KPI shrinks its figure to fit its own card, not the screen: the
