@@ -481,7 +481,7 @@ def test_the_admin_sees_reversar_on_a_sale_in_the_table_and_the_card(
 
     assert _reverse_links(page, sale) == 2
     assert _reverse_links(page, stocked) == 2
-    assert "<th>Acciones</th>" in page
+    assert '<th class="k-col--actions">Acciones</th>' in page
 
 
 def test_the_operario_sees_reversar_except_on_sales(

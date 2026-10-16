@@ -169,14 +169,16 @@
         <table class="k-table k-table--wide" id="movements-table">
             <thead>
                 <tr>
-                    <th>N.º · Fecha</th>
+                    {#- Fixed widths per column (spec 010): Artículo has none and
+                        takes what is left. -#}
+                    <th class="k-col--ref">N.º · Fecha</th>
                     <th>Artículo</th>
-                    <th class="k-num">Cantidad</th>
-                    <th>Motivo</th>
-                    <th class="k-num">Venta</th>
-                    <th>Usuario</th>
-                    <th>Observación</th>
-                    <th>Acciones</th>
+                    <th class="k-num k-col--qty">Cantidad</th>
+                    <th class="k-col--reason">Motivo</th>
+                    <th class="k-num k-col--sale">Venta</th>
+                    <th class="k-col--user">Usuario</th>
+                    <th class="k-col--note">Observación</th>
+                    <th class="k-col--actions">Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -201,7 +203,7 @@
                     <td class="k-num k-c-sale">{{ sale_cell(movement) }}</td>
                     <td class="k-dim k-c-user" title="{{ movement.user.username }}">{{ movement.user.username }}</td>
                     {%- if movement.note %}
-                    <td class="k-dim k-c-note" title="{{ movement.note }}">{{ movement.note }}</td>
+                    <td class="k-dim k-c-note" title="{{ movement.note }}"><span class="k-clamp-3">{{ movement.note }}</span></td>
                     {%- else %}
                     <td class="k-dim k-c-note">-</td>
                     {%- endif %}

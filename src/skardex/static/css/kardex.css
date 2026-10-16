@@ -401,6 +401,28 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .k-table--wide{border-collapse:separate;border-spacing:0}
 .k-table--wide th:first-child,.k-table--wide td:first-child{position:sticky;left:0;z-index:1}
 .k-table--wide td:first-child{background:var(--surface)}
+/* Fixed column widths (spec 010): each column keeps its width on every
+   page, whatever it holds. What does not fit is cut ("…", 3 lines) or the
+   table scrolls sideways; text is never squeezed. Artículo has no width:
+   it takes what is left, at least 300px, so min-width is the fixed columns
+   (1076px) plus those 300. */
+.k-table--wide{table-layout:fixed;min-width:1376px}
+.k-table--wide th,.k-table--wide td{box-sizing:border-box}
+.k-col--ref{width:104px}
+.k-col--qty{width:168px}
+.k-col--reason{width:210px}
+.k-col--sale{width:170px}
+.k-col--user{width:110px}
+.k-col--note{width:150px}
+.k-col--actions{width:164px}
+/* One line each: the reason ("Reverso de venta #4874"), what was reversed
+   ("Reversado 2,25 de 1.250,5"); a long username ends in "…" (its title
+   has it whole). */
+.k-table--wide .k-c-reason,.k-table--wide a.k-reversed-note{white-space:nowrap}
+.k-table--wide .k-c-user{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A long note: 3 lines, then "…" (its title has it whole). On an inner
+   span: line-clamp needs a box of its own, a table cell is not one. */
+.k-clamp-3{display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 
 /* One card per movement on touch screens and below 1024px: item and
    quantity; date · reason · user; the billing line (a sale's amount, and
@@ -466,7 +488,8 @@ td .k-actions{flex-direction:column;align-items:flex-start}
 .k-qty--in{color:var(--ok)}
 /* The "Venta" column of the history (spec 010): the amount, "a $ X c/u"
    and the payment state, one per line, right-aligned like the numbers. */
-.k-c-sale > span{display:block}
+/* Only the parts of a sale stack; a lone tag ("Sin precio") keeps its size. */
+.k-sale__amount,.k-sale__unit,.k-sale__state{display:block}
 .k-sale__amount{font-weight:700;color:var(--text);white-space:nowrap}
 .k-sale__unit{font-size:13px;color:var(--muted);white-space:nowrap}
 .k-sale__state{margin-top:4px;white-space:nowrap}

@@ -88,7 +88,7 @@ def test_the_history_shows_each_movement_number_in_table_and_card(
     """EARS-H4-01"""
     page = admin_client.get("/movements").text
 
-    assert "<th>N.º · Fecha</th>" in page
+    assert '<th class="k-col--ref">N.º · Fecha</th>' in page
     assert (
         f'<td class="k-dim"><span class="k-stack">#{sale.id}</span>'
         '<span class="k-stack">10/09/2026</span></td>'

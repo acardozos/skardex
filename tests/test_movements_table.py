@@ -1,9 +1,11 @@
 """The desktop table of Movimientos (spec 010, task 1): the single "Venta"
 column, and the user and note shown whole on hover."""
 
+import re
 from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -53,7 +55,7 @@ def test_venta_replaces_unit_price_amount_and_payment_columns(
     """EARS-H1-05"""
     head = _thead(admin_client.get("/movements").text)
 
-    assert '<th class="k-num">Venta</th>' in head
+    assert '<th class="k-num k-col--sale">Venta</th>' in head
     for old in ("Precio unit.", "Monto", "Cobro", "Tipo"):
         assert old not in head
 
@@ -215,7 +217,76 @@ def test_the_note_cell_carries_the_whole_note_in_its_title(
 
     assert (
         '<td class="k-dim k-c-note" title="una nota larga del taller">'
-        "una nota larga del taller</td>"
+        '<span class="k-clamp-3">una nota larga del taller</span></td>'
     ) in page
     table = page.split('id="movements-table"')[1].split("</table>")[0]
     assert '<td class="k-dim k-c-note">-</td>' in table
+
+
+# --- Fixed column widths (task 2: H1-01..04, H1-11, H1-14, H1-15) -------------
+
+
+def test_each_column_but_articulo_has_its_width_class(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H1-01, H1-02 (Artículo takes what is left; measured in captures)"""
+    head = _thead(admin_client.get("/movements").text)
+
+    for header in (
+        '<th class="k-col--ref">N.º · Fecha</th>',
+        "<th>Artículo</th>",
+        '<th class="k-num k-col--qty">Cantidad</th>',
+        '<th class="k-col--reason">Motivo</th>',
+        '<th class="k-num k-col--sale">Venta</th>',
+        '<th class="k-col--user">Usuario</th>',
+        '<th class="k-col--note">Observación</th>',
+        '<th class="k-col--actions">Acciones</th>',
+    ):
+        assert header in head
+
+
+def test_the_css_fixes_the_widths_and_cuts_what_does_not_fit(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H1-01..04, H1-11, H1-14, H1-15: the rules the captures measure."""
+    css = admin_client.get("/static/css/kardex.css").text
+
+    for rule in (
+        ".k-table--wide{table-layout:fixed;min-width:1376px}",
+        ".k-table--wide th,.k-table--wide td{box-sizing:border-box}",
+        ".k-col--ref{width:104px}",
+        ".k-col--qty{width:168px}",
+        ".k-col--reason{width:210px}",
+        ".k-col--sale{width:170px}",
+        ".k-col--user{width:110px}",
+        ".k-col--note{width:150px}",
+        ".k-col--actions{width:164px}",
+        ".k-table--wide .k-c-reason,.k-table--wide a.k-reversed-note"
+        "{white-space:nowrap}",
+        ".k-table--wide .k-c-user{white-space:nowrap;overflow:hidden;"
+        "text-overflow:ellipsis}",
+        "-webkit-line-clamp:3",
+        ".k-sale__amount,.k-sale__unit,.k-sale__state{display:block}",
+    ):
+        assert rule in css
+    # A lone tag in "Venta" ("Sin precio") must keep its size, not stretch.
+    assert ".k-c-sale > span{display:block}" not in css
+
+
+def test_the_min_width_is_the_fixed_columns_plus_articulo_minimum() -> None:
+    """EARS-H1-02, H1-03: 1376 = the fixed widths + Artículo's 300px, so the
+    table scrolls instead of squeezing Artículo below 300."""
+    css = (Path(__file__).parents[1] / "src/skardex/static/css/kardex.css").read_text()
+    widths = [
+        int(w)
+        for w in re.findall(
+            r"\.k-col--(?:ref|qty|reason|sale|user|note|actions)\{width:(\d+)px\}",
+            css,
+        )
+    ]
+    match = re.search(r"\.k-table--wide\{table-layout:fixed;min-width:(\d+)px", css)
+    assert match is not None
+    min_width = int(match.group(1))
+
+    assert len(widths) == 7
+    assert min_width == sum(widths) + 300
