@@ -85,10 +85,12 @@ def create_user(
     try:
         create_operario(db, username=username, password=password)
     except (DuplicateUsernameError, WeakPasswordError) as exc:
+        # What was typed comes back, so an error never means starting over;
+        # the password does not (it is never written into a page).
         return templates.TemplateResponse(
             request,
             "users/form.html",
-            {"error": _error_message(exc)},
+            {"error": _error_message(exc), "username": username},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 

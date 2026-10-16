@@ -97,6 +97,43 @@ def test_create_user_with_short_password_is_rejected(
     assert db_session.query(User).filter(User.username == "nuevo-corto").first() is None
 
 
+def test_a_rejected_new_user_keeps_the_username_but_not_the_password(
+    admin_client: TestClient,
+) -> None:
+    """Regression: a password that does not meet the rules used to clear the
+    whole form, so the admin had to type the username again."""
+    response = admin_client.post(
+        "/users/new",
+        data={"username": "nuevo-corto", "password": "abc123"},
+    )
+
+    assert response.status_code == 400
+    assert 'name="username" required autofocus placeholder="josemi" ' in response.text
+    assert 'value="nuevo-corto"' in response.text
+    assert "abc123" not in response.text
+
+
+def test_a_duplicate_username_comes_back_to_be_changed(
+    admin_client: TestClient, operario_user: User
+) -> None:
+    """Regression: same as above for a username already taken."""
+    response = admin_client.post(
+        "/users/new",
+        data={"username": operario_user.username, "password": "otra-pass-1"},
+    )
+
+    assert response.status_code == 400
+    assert f'value="{operario_user.username}"' in response.text
+    assert "otra-pass-1" not in response.text
+
+
+def test_the_new_user_form_starts_empty(admin_client: TestClient) -> None:
+    assert (
+        'id="username" name="username" required autofocus placeholder="josemi" value=""'
+        in (admin_client.get("/users/new").text)
+    )
+
+
 def test_users_list_does_not_offer_deactivate_for_admin(
     admin_client: TestClient, admin_user: User
 ) -> None:

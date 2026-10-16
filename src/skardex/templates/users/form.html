@@ -18,7 +18,7 @@
         <form class="k-form" method="post" action="/users/new">
             <div class="k-field">
                 <label class="k-label" for="username">Usuario</label>
-                <input class="k-input" type="text" id="username" name="username" required autofocus placeholder="josemi">
+                <input class="k-input" type="text" id="username" name="username" required autofocus placeholder="josemi" value="{{ username or '' }}">
             </div>
             <div class="k-field">
                 <label class="k-label" for="password">Contraseña inicial</label>
