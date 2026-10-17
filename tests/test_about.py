@@ -106,8 +106,8 @@ def test_the_page_says_version_commit_date_who_it_is_for_and_who_made_it(
     assert "<p>Para Zona 58</p>" in main
     assert "Si algo falla, avísale al administrador." in main
     assert (
-        'Desarrollado por <a href="https://acardozos.github.io">'
-        "Adolfo J. Cardozo S.</a>"
+        'Desarrollado por <a href="https://acardozos.github.io" target="_blank"'
+        ' rel="noopener noreferrer">Adolfo J. Cardozo S.</a>'
     ) in main
 
 
