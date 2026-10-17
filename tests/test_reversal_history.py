@@ -108,7 +108,7 @@ def test_pagos_shows_each_sale_number_in_table_and_card(
 
     page = admin_client.get(f"/payments?estado={estado}").text
 
-    assert "<th>N.º · Fecha</th>" in page
+    assert '<th class="k-col--ref">N.º · Fecha</th>' in page
     assert (
         f'<td class="k-dim"><span class="k-stack">#{sale.id}</span>'
         '<span class="k-stack">10/09/2026</span></td>'

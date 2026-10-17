@@ -1,15 +1,20 @@
 {% extends "base.html" %}
 {% from "_pagination.html" import pager, pager_summary %}
 
-{% block title %}Pendiente de pago — Simple Kardex{% endblock %}
+{% block title %}Pagos — Simple Kardex{% endblock %}
 
 {% block content %}
+{% set subtitles = {
+    "pendientes": "Ventas registradas que todavía no se han pagado.",
+    "pagados": "Ventas ya pagadas, con su fecha de pago.",
+    "todos": "Todas las ventas con precio, pendientes y pagadas.",
+} %}
 <main class="k-main k-main--wide">
     <div class="k-page-head">
         <div>
             <p class="k-eyebrow">Cobros</p>
-            <h1>Pendiente de pago</h1>
-            <p>Ventas registradas que todavía no se han pagado. El total es global, no se separa por cliente.</p>
+            <h1>Pagos</h1>
+            <p id="payments-subtitle">{{ subtitles[estado] }}</p>
         </div>
     </div>
 
@@ -20,7 +25,7 @@
     <p class="k-banner k-banner--danger" id="payment-error">{{ error }}</p>
     {% endif %}
 
-    <div class="k-kpis">
+    <div class="k-kpis k-kpis--compact">
         <div class="k-kpi">
             <span class="k-kpi__value k-kpi__value--money">{{ pending_total | cop }}</span>
             <span class="k-kpi__label">Total pendiente{% if unpriced %} (sin contar las ventas sin precio){% endif %}</span>
@@ -49,6 +54,13 @@
 
     {% set can_pay = user.role == "admin" and estado == "pendientes" and sales %}
     {% set all_checked = selected_ids is none or selected_ids | length == sales | length %}
+    {#- Which columns the tables have (spec 010): the admin's pick box (only
+        to pay, in Pendientes) and action, and "Pago" outside Pendientes. Each
+        combination has its own minimum width and the window width below
+        which it scrolls sideways, in kardex.css. -#}
+    {% set show_pay = estado != "pendientes" %}
+    {% set sales_variant = "k-sales--" ~ ("admin" if user.role == "admin" else "operario") ~ ("-pick" if can_pay else "") ~ ("-pay" if show_pay else "") %}
+    {% set note_col = "k-col--note" if show_pay else "k-col--note-wide" %}
     {% if can_pay %}
     <form class="k-payform" method="post" action="/payments/register" id="payment-form">
         {#- First, so the fixed bar at the bottom fits on one line. -#}
@@ -58,24 +70,29 @@
         </div>
     {% endif %}
     <div class="k-card k-card--sticky-head">
-        {#- 720px and up: the table. Its checkboxes are the only ones that are
-            sent (`name="movement_ids"`), even while CSS hides the table. -#}
+        {#- 1024px and up: the table, with fixed column widths (spec 010). It
+            scrolls sideways only while the window is too narrow for it; when
+            it fits it is not a scroll box, so its header stays fixed. Its
+            checkboxes are the only ones that are sent (`name="movement_ids"`),
+            even while CSS hides the table. -#}
+        <p class="k-scroll__hint" data-scroll-hint hidden>Desliza para ver más columnas →</p>
+        <div class="k-scroll--when-needed {{ sales_variant }}" data-scroll-box>
         <table class="k-table k-table--sales" id="sales-table">
             <thead>
                 <tr>
                     {% if can_pay %}
-                    <th><label class="k-pick"><input type="checkbox" id="select-all" data-select-all aria-label="Seleccionar todas" {% if all_checked %}checked{% endif %}></label></th>
+                    <th class="k-col--pick"><label class="k-pick"><input type="checkbox" id="select-all" data-select-all aria-label="Seleccionar todas" {% if all_checked %}checked{% endif %}></label></th>
                     {% endif %}
-                    <th>N.º · Fecha</th>
+                    <th class="k-col--ref">N.º · Fecha</th>
                     <th>Artículo</th>
-                    <th class="k-num">Cantidad</th>
-                    <th class="k-num">Precio unit.</th>
-                    <th class="k-num">Monto</th>
-                    {% if estado != "pendientes" %}
-                    <th>Pago</th>
+                    <th class="k-num k-col--pqty">Cantidad</th>
+                    <th class="k-num k-col--price">Precio unit.</th>
+                    <th class="k-num k-col--amount">Monto</th>
+                    {% if show_pay %}
+                    <th class="k-col--pay">Pago</th>
                     {% endif %}
-                    <th>Observación</th>
-                    {% if user.role == "admin" %}<th></th>{% endif %}
+                    <th class="{{ note_col }}">Observación</th>
+                    {% if user.role == "admin" %}<th class="k-col--actions"></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -98,7 +115,7 @@
                     <td class="k-num">{{ sale.unit_price | cop }}</td>
                     <td class="k-num k-strong">{{ sale.amount | cop }}</td>
                     {% endif %}
-                    {% if estado != "pendientes" %}
+                    {% if show_pay %}
                     <td>
                         {% if sale.is_fully_reversed %}<span class="k-tag k-tag--neutral">Reversada</span>
                         {% elif sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> <span class="k-dim">{{ sale.paid_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="k-tag">Pendiente</span>{% endif %}
@@ -112,6 +129,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
 
         {#- Below 720px: one card per sale. Its checkbox has no name, so it is
             never sent: it arrives disabled, showing the same state as its
@@ -202,22 +220,35 @@
             <h2 class="k-card__title">Ventas sin precio</h2>
             <span class="k-card__meta">No suman al total hasta que se les fije el precio</span>
         </div>
+        {#- The same columns and widths as the table above, in each tab, so
+            they line up (spec 010); the extra ones only on desktop
+            (`k-only-wide`), as a list of cards below 720px. -#}
+        <p class="k-scroll__hint" data-scroll-hint hidden>Desliza para ver más columnas →</p>
+        <div class="k-scroll--when-needed {{ sales_variant }}" data-scroll-box>
         <table class="k-table k-table--cards k-table--unpriced" id="unpriced-table">
             <thead>
                 <tr>
-                    <th>Fecha</th>
+                    {% if can_pay %}<th class="k-col--pick k-only-wide"></th>{% endif %}
+                    <th class="k-col--ref">N.º · Fecha</th>
                     <th>Artículo</th>
-                    <th class="k-num">Cantidad</th>
-                    <th>Observación</th>
-                    {% if user.role == "admin" %}<th></th>{% endif %}
+                    <th class="k-num k-col--pqty">Cantidad</th>
+                    <th class="k-num k-col--price k-only-wide">Precio unit.</th>
+                    <th class="k-num k-col--amount k-only-wide">Monto</th>
+                    {% if show_pay %}<th class="k-col--pay k-only-wide">Pago</th>{% endif %}
+                    <th class="{{ note_col }}">Observación</th>
+                    {% if user.role == "admin" %}<th class="k-col--actions"></th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for sale in unpriced %}
                 <tr>
-                    <td class="k-dim k-c-date">{{ sale.movement_date.strftime('%d/%m/%Y') }}</td>
+                    {% if can_pay %}<td class="k-only-wide"></td>{% endif %}
+                    <td class="k-dim k-c-date"><span class="k-stack k-only-wide">#{{ sale.id }}</span><span class="k-stack">{{ sale.movement_date.strftime('%d/%m/%Y') }}</span></td>
                     <td class="k-strong k-c-name">{{ sale.material.name }}</td>
                     <td class="k-num k-c-qty">{{ sale.quantity | qty }} {{ unit_labels.get(sale.material.unit, sale.material.unit) }}</td>
+                    <td class="k-num k-only-wide"><span class="k-tag k-tag--warn">Sin precio</span></td>
+                    <td class="k-num k-dim k-only-wide">—</td>
+                    {% if show_pay %}<td class="k-dim k-only-wide">—</td>{% endif %}
                     <td class="k-dim k-c-note{{ '' if sale.note else ' is-empty' }}">{{ sale.note or "-" }}</td>
                     {% if user.role == "admin" %}
                     <td class="k-c-actions"><a class="k-btn k-btn--ghost k-btn--sm" href="/movements/{{ sale.id }}/billing?next={{ here | urlencode }}">Corregir cobro</a></td>
@@ -226,10 +257,24 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
     {% endif %}
 </main>
 
+<script>
+  // Each "Desliza…" hint shows only while its table is wider than its box,
+  // that is, while the box scrolls (spec 010).
+  (function () {
+    if (!window.ResizeObserver) return;
+    document.querySelectorAll("[data-scroll-box]").forEach((box) => {
+      const hint = box.previousElementSibling;
+      new ResizeObserver(() => {
+        hint.hidden = box.scrollWidth <= box.clientWidth;
+      }).observe(box);
+    });
+  })();
+</script>
 {% if can_pay %}
 <script>
   // Comfort only: the server recomputes everything from the ids it receives.

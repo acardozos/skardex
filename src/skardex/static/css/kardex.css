@@ -497,6 +497,53 @@ td .k-actions{flex-direction:column;align-items:flex-start}
    not a button to press; the note underneath says why. */
 .k-btn--blocked,.k-btn--blocked:hover{border-style:dashed;opacity:.55;cursor:not-allowed;background:transparent}
 
+/* ---------- Pagos: fixed column widths (spec 010) ---------- */
+/* Same idea as Movimientos: each column keeps its width (Artículo takes
+   the rest, at least 300px). The columns depend on the role and the tab
+   (the admin's pick box and action; "Pago" outside Pendientes, where the
+   note gets its width), so each combination (`k-sales--…`, on the box
+   around the table) has its own minimum width: 867px of shared columns
+   (N.º 104, Artículo 300, Cantidad 160, Precio 139, Monto 164) plus its
+   own. "Ventas sin precio" uses the same classes, so both tables line up;
+   its extra columns (`k-only-wide`) only show on desktop. */
+.k-col--pick{width:44px}
+.k-col--pqty{width:160px}
+.k-col--price{width:139px}
+.k-col--amount{width:164px}
+.k-col--pay{width:120px}
+.k-col--note-wide{width:210px}
+.k-only-wide{display:none}
+@media (min-width:1024px){
+  th.k-only-wide,td.k-only-wide{display:table-cell}
+  span.k-only-wide{display:block}
+  .k-table--sales,.k-table--unpriced{table-layout:fixed}
+  .k-table--sales th,.k-table--sales td,.k-table--unpriced th,.k-table--unpriced td{box-sizing:border-box}
+  .k-sales--operario .k-table{min-width:1077px}
+  .k-sales--operario-pay .k-table{min-width:1137px}
+  .k-sales--admin .k-table{min-width:1241px}
+  .k-sales--admin-pick .k-table{min-width:1285px}
+  .k-sales--admin-pay .k-table{min-width:1301px}
+  /* While it scrolls, N.º · Fecha stays put (after the pick box, if any). */
+  .k-scroll--when-needed th:first-child,.k-scroll--when-needed td:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
+  .k-scroll--when-needed th:first-child{background:var(--bg)}
+  .k-sales--admin-pick th:nth-child(2),.k-sales--admin-pick td:nth-child(2){position:sticky;left:44px;z-index:1;background:var(--surface)}
+  .k-sales--admin-pick th:nth-child(2){background:var(--bg)}
+}
+/* Scroll sideways only while the window is narrower than the table needs
+   (its minimum width + 42px of page margins and card border). Above that
+   the box is not a scroll box, so the header of the table stays fixed while
+   the page scrolls (it cannot inside one). Keep these in step with the
+   minimum widths above. */
+@media (min-width:1024px) and (max-width:1118.98px){.k-sales--operario{overflow-x:auto}}
+@media (min-width:1024px) and (max-width:1178.98px){.k-sales--operario-pay{overflow-x:auto}}
+@media (min-width:1024px) and (max-width:1282.98px){.k-sales--admin{overflow-x:auto}}
+@media (min-width:1024px) and (max-width:1326.98px){.k-sales--admin-pick{overflow-x:auto}}
+@media (min-width:1024px) and (max-width:1342.98px){.k-sales--admin-pay{overflow-x:auto}}
+/* The counters stop growing: on a wide page they would stretch across it. */
+@media (min-width:1024px){
+  .k-kpis--compact{grid-template-columns:repeat(auto-fill,minmax(200px,280px))}
+}
+
 /* ---------- Pagos: touch selection and fixed pay bar (spec 007, H3) ---------- */
 /* A money KPI shrinks its figure to fit its own card, not the screen: the
    widest screens (tablets, three KPIs a row) have the narrowest cards. The
@@ -570,6 +617,15 @@ td .k-actions{flex-direction:column;align-items:flex-start}
   .k-card--sticky-head{overflow-x:clip}
   .k-card--sticky-head .k-table thead th{position:sticky;top:56px;z-index:2;box-shadow:inset 0 -1px 0 var(--border)}
 }
+/* The card clips only sideways (overflow-x), and that does not follow its
+   round corners: when the table is the first thing in the card, its header
+   cells paint over them and the top border looks cut short (Pagos,
+   Artículos, Usuarios; spec 010). The corner cells get the card's curve
+   (14px minus the 1px border). */
+.k-card--sticky-head > .k-table:first-child thead th:first-child,
+.k-card--sticky-head > [data-scroll-box] .k-table thead th:first-child{border-top-left-radius:13px}
+.k-card--sticky-head > .k-table:first-child thead th:last-child,
+.k-card--sticky-head > [data-scroll-box] .k-table thead th:last-child{border-top-right-radius:13px}
 
 
 /* ---------- Phones: more list, less heading (spec 007, H2-12) ---------- */

@@ -32,12 +32,12 @@ def test_payments_requires_login(client: TestClient) -> None:
 def test_both_roles_can_open_the_screen(
     admin_client: TestClient, operario_client: TestClient
 ) -> None:
-    """EARS-H4-01"""
+    """EARS-H4-01; titled "Pagos" since spec 010 (EARS-H2-06)."""
     for client in (admin_client, operario_client):
         response = client.get("/payments")
 
         assert response.status_code == 200
-        assert "<h1>Pendiente de pago</h1>" in response.text
+        assert "<h1>Pagos</h1>" in response.text
 
 
 def test_pending_sales_are_listed_with_their_columns(
