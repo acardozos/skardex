@@ -134,6 +134,7 @@ def test_no_screen_shows_the_old_word_to_the_admin(
         "/users",
         "/users/new",
         "/account/password",
+        "/about",
         "/no-such-page",
     ]
     for page in pages:
@@ -160,6 +161,7 @@ def test_no_screen_shows_the_old_word_to_the_operario(
         "/payments",
         "/account/password",
         "/users",
+        "/about",
     ]:
         response = operario_client.get(page)
         assert response.status_code in (200, 403), page

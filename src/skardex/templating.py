@@ -10,6 +10,7 @@ from skardex.quantities import format_quantity
 from skardex.services.billing_service import can_fix_billing
 from skardex.services.reversal_service import ReversalBlock, chain_root
 from skardex.static_files import static_url
+from skardex.version import app_version
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -21,6 +22,7 @@ templates.env.globals["ReversalBlock"] = ReversalBlock
 templates.env.globals["per_page_options"] = PER_PAGE_OPTIONS
 templates.env.globals["page_url"] = build_url
 templates.env.globals["static_url"] = static_url
+templates.env.globals["app_version"] = app_version
 templates.env.filters["cop"] = format_cop
 templates.env.filters["qty"] = format_quantity
 templates.env.filters["movement_ref"] = movement_ref

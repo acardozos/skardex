@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from skardex.config import settings
 from skardex.routers import (
+    about,
     account,
     auth,
     dashboard,
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
         # tag in base.html; no login required, same as the static files.
         return FileResponse(STATIC_DIR / "img" / "skardex.ico")
 
+    app.include_router(about.router)
     app.include_router(account.router)
     app.include_router(auth.router)
     app.include_router(dashboard.router)

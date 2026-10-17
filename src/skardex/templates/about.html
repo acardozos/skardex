@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "_logo.html" import app_logo %}
+
+{% block title %}Acerca de — Simple Kardex{% endblock %}
+
+{% block content %}
+{% set v = app_version() %}
+<main class="k-main">
+    <div class="k-about">
+        {{ app_logo("k-about__logo", 56) }}
+        <h1>Simple Kardex</h1>
+        {#- The commit and date only come with a deploy (spec 010). -#}
+        <p class="k-about__version" id="about-version">Versión {{ v.number }}{% if v.commit %} ({{ v.commit }}){% endif %}{% if v.built_on %} · {{ v.built_on.strftime('%d/%m/%Y') }}{% endif %}</p>
+        <p>Para Zona 58</p>
+        <p class="k-about__help">Si algo falla, avísale al administrador.</p>
+        <p class="k-about__credit">Desarrollado por <a href="https://acardozos.github.io">Adolfo J. Cardozo S.</a></p>
+    </div>
+</main>
+{% endblock %}

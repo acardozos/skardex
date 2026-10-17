@@ -14,6 +14,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 # Now copy the actual source and install the project itself.
 COPY . .
 RUN uv sync --frozen --no-dev
+# The build date for "Acerca de" (spec 010). After `COPY . .`, so it runs
+# again on every deploy that changes the code.
+RUN date -u +%F > /app/BUILD_DATE
 
 ENV PATH="/app/.venv/bin:$PATH"
 

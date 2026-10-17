@@ -66,6 +66,7 @@
                 <a class="{% if request.url.path.startswith('/users') %}is-active{% endif %}" href="/users">Usuarios</a>
                 {% endif %}
                 <a class="{% if on_account %}is-active{% endif %}" href="/account/password">Mi cuenta</a>
+                <a class="{% if request.url.path == '/about' %}is-active{% endif %}" href="/about">Acerca de</a>
                 <div class="k-menu__foot">
                     <span>{{ request.session.get("username") }} · {{ role_label }}</span>
                     <button type="button" class="k-btn k-btn--ghost k-btn--icon" onclick="kardexTheme()" aria-label="Cambiar tema" title="Cambiar tema">{{ theme_icon }}</button>
@@ -79,6 +80,11 @@
 </header>
 {% endif %}
 {% block content %}{% endblock %}
+{#- Wherever the menu is shown (signed in; not on Login nor the forced
+    password change): which version this is (spec 010). -#}
+{% if header_shown() %}
+<footer class="k-footer">Simple Kardex v{{ app_version().number }} · <a href="/about">Acerca de</a></footer>
+{% endif %}
 <script>
   // Show/hide buttons of password fields (spec 003, H6): they start hidden
   // and appear only here, so without JavaScript there is no dead button.

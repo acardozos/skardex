@@ -115,6 +115,19 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
 
 /* ---------- Estructura de página ---------- */
 .k-main{max-width:1040px;margin:0 auto;padding:32px 20px 72px;display:flex;flex-direction:column;gap:24px}
+/* One line at the end of every signed-in screen (spec 010): the version and
+   "Acerca de". Small and quiet; it comes after the page, so on Pagos the
+   fixed pay bar settles above it at the end of the list. */
+.k-footer{max-width:1040px;margin:-40px auto 0;padding:14px 20px calc(20px + env(safe-area-inset-bottom));border-top:1px solid var(--border);text-align:center;font-size:12px;color:var(--muted)}
+.k-footer a{color:var(--muted);text-decoration:underline}
+.k-footer a:hover{color:var(--text)}
+/* "Acerca de": centered, like the error pages. */
+.k-about{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:40px 0}
+.k-about h1{margin:10px 0 4px}
+.k-about p{margin:0}
+.k-about__version{color:var(--muted);font-variant-numeric:tabular-nums}
+.k-about .k-about__help{margin-top:14px}
+.k-about .k-about__credit{margin-top:22px;font-size:13px;color:var(--muted)}
 .k-page-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
 .k-eyebrow{margin:0;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent)}
 .k-page-head h1{margin:8px 0 6px;font-size:32px;letter-spacing:-0.03em}
