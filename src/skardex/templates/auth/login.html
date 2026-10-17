@@ -22,11 +22,14 @@
             <form class="k-form" method="post" action="/login">
                 <div class="k-field">
                     <label class="k-label" for="username">Usuario</label>
-                    <input class="k-input" type="text" id="username" name="username" required autofocus>
+                    {#- After a failed attempt the username is kept and the cursor
+                        waits in the password, the only thing to type again. -#}
+                    {% set retry = username | default('') %}
+                    <input class="k-input" type="text" id="username" name="username" required{% if not retry %} autofocus{% endif %} value="{{ retry }}">
                 </div>
                 <div class="k-field">
                     <label class="k-label" for="password">Contraseña</label>
-                    {{ password_field("password") }}
+                    {{ password_field("password", autofocus=retry) }}
                 </div>
                 <button type="submit" class="k-btn k-btn--primary k-btn--block">Ingresar</button>
             </form>

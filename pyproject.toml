@@ -1,6 +1,6 @@
 [project]
 name = "skardex"
-version = "0.10.0"
+version = "0.10.1"
 description = "Webapp simple de control de materiales e insumos (kardex)"
 readme = "README.md"
 license = "MIT"

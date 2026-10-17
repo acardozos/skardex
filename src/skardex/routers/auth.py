@@ -27,10 +27,12 @@ def login_submit(
     user = authenticate(db, username=username, password=password)
 
     if user is None:
+        # The username comes back so only the password has to be typed
+        # again; the password never does. Same answer whatever the reason.
         return templates.TemplateResponse(
             request,
             "auth/login.html",
-            {"error": LOGIN_ERROR_MESSAGE},
+            {"error": LOGIN_ERROR_MESSAGE, "username": username},
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 

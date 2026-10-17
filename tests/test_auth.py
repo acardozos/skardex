@@ -1,4 +1,7 @@
+import re
+
 from fastapi.testclient import TestClient
+from httpx2 import Response
 
 from skardex.models import User
 
@@ -86,7 +89,16 @@ def test_the_three_rejection_reasons_are_indistinguishable(
         data={"username": inactive_user.username, "password": "whatever-pass"},
     )
 
-    assert wrong_password.text == unknown_user.text == inactive.text
+    # Each page gives back the username typed (fix 0.10.1), so that part is
+    # set aside; everything else, the reason included, must be identical.
+    def without_typed(response: Response, typed: str) -> str:
+        return response.text.replace(f'value="{typed}"', 'value=""')
+
+    assert (
+        without_typed(wrong_password, operario_user.username)
+        == without_typed(unknown_user, "ghost")
+        == without_typed(inactive, inactive_user.username)
+    )
 
 
 def test_no_public_registration_route_exists(client: TestClient) -> None:
@@ -144,3 +156,48 @@ def test_login_page_offers_no_forgot_password_flow(client: TestClient) -> None:
 
     for path in ("/forgot-password", "/reset-password", "/password-reset"):
         assert client.get(path, follow_redirects=False).status_code == 404
+
+
+# --- A failed login keeps the username (fix 0.10.1) ---------------------------
+
+
+def _input(html: str, field: str) -> str:
+    match = re.search(rf'<input[^>]*id="{field}"[^>]*>', html)
+    assert match is not None
+    return match.group(0)
+
+
+def test_a_failed_login_keeps_the_username_and_waits_in_the_password(
+    client: TestClient, operario_user: User
+) -> None:
+    """Only the password has to be typed again, and it never comes back."""
+    html = client.post(
+        "/login",
+        data={"username": operario_user.username, "password": "wrong-pass"},
+    ).text
+
+    username, password = _input(html, "username"), _input(html, "password")
+    assert f'value="{operario_user.username}"' in username
+    assert "autofocus" not in username
+    assert "autofocus" in password
+    assert "value=" not in password
+    assert "wrong-pass" not in html
+
+
+def test_the_first_visit_starts_empty_in_the_username(client: TestClient) -> None:
+    html = client.get("/login").text
+
+    username, password = _input(html, "username"), _input(html, "password")
+    assert 'value=""' in username
+    assert "autofocus" in username
+    assert "autofocus" not in password
+
+
+def test_the_username_given_back_is_escaped(client: TestClient) -> None:
+    """What was typed is shown as text, never run as HTML."""
+    html = client.post(
+        "/login", data={"username": 'x"><script>alert(1)</script>', "password": "p"}
+    ).text
+
+    assert "<script>alert(1)</script>" not in html
+    assert 'value="x&#34;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"' in html
