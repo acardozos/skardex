@@ -161,11 +161,11 @@
     {%- endif -%}
     {%- endmacro %}
 
-    <div class="k-card">
+    <div class="k-card k-card--sticky-head">
         {#- Desktop: the real table, all 8 columns. Touch screens and narrow
             windows get the cards below instead (spec 007, H2). -#}
         <p class="k-scroll__hint" id="movements-hint" hidden>Desliza para ver más columnas →</p>
-        <div class="k-scroll" id="movements-scroll">
+        <div class="k-scroll" id="movements-scroll" data-scroll-box>
         <table class="k-table k-table--wide" id="movements-table">
             <thead>
                 <tr>

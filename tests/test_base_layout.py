@@ -231,14 +231,20 @@ def test_the_viewport_lets_the_page_use_the_safe_areas(client: TestClient) -> No
     assert "viewport-fit=cover" in html
 
 
-def test_table_headers_stick_on_desktop_except_in_movimientos(
+def test_table_headers_stick_on_desktop(
     admin_client: TestClient, material: Material
 ) -> None:
-    """EARS-H9-06, X-05 — and clip/sticky only live inside the desktop query,
-    so tablets and phones (cards, sideways scroll) are left as they were."""
-    for page in ("/", "/materials", "/users", "/payments?estado=todos"):
+    """EARS-H9-06 (and EARS-H10-01 of spec 010, which adds Movimientos and
+    lifts X-05) — and clip/sticky only live inside the desktop query, so
+    tablets and phones (cards, sideways scroll) are left as they were."""
+    for page in (
+        "/",
+        "/materials",
+        "/users",
+        "/payments?estado=todos",
+        "/movements",
+    ):
         assert "k-card k-card--sticky-head" in admin_client.get(page).text, page
-    assert "k-card--sticky-head" not in admin_client.get("/movements").text
 
     css = admin_client.get("/static/css/kardex.css").text
     desktop = css.index(

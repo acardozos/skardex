@@ -290,3 +290,31 @@ def test_the_min_width_is_the_fixed_columns_plus_articulo_minimum() -> None:
 
     assert len(widths) == 7
     assert min_width == sum(widths) + 300
+
+
+# --- Fixed header while the table fits (H10) ---------------------------------
+
+
+def test_the_card_has_a_fixed_header_and_the_box_a_scroll_hook(
+    admin_client: TestClient,
+) -> None:
+    """EARS-H10-01, H10-03: the card is one of the sticky-header cards, and
+    the box is marked so its header corners follow the card's curve."""
+    page = admin_client.get("/movements").text
+
+    assert '<div class="k-card k-card--sticky-head">' in page
+    assert '<div class="k-scroll" id="movements-scroll" data-scroll-box>' in page
+
+
+def test_the_box_scrolls_only_below_the_min_width_plus_the_page_margins() -> None:
+    """EARS-H10-01, H10-02, H1-03, H1-04: above that point the box is not a
+    scroll box (so the header can stick); below it, it scrolls sideways."""
+    css = (Path(__file__).parents[1] / "src/skardex/static/css/kardex.css").read_text()
+    min_width = re.search(r"\.k-table--wide\{table-layout:fixed;min-width:(\d+)px", css)
+    scroll = re.search(
+        r"@media \(max-width:([\d.]+)px\)\{\.k-scroll\{overflow-x:auto\}\}", css
+    )
+    assert min_width is not None and scroll is not None
+
+    assert float(scroll.group(1)) == int(min_width.group(1)) + 42 - 0.02
+    assert ".k-scroll{overflow-x:auto}" not in css.replace(scroll.group(0), "")

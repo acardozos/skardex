@@ -394,7 +394,11 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
    window too narrow for Movimientos, its first column (number and date)
    stays put while the rest scrolls, with a hint. */
 .k-main--wide{max-width:none}
-.k-scroll{overflow-x:auto}
+/* Sideways scroll only while the window is narrower than the table needs
+   (its 1376px minimum + 42px of page margins and card border, as in Pagos).
+   Above that the box is not a scroll box, so the header stays fixed while
+   the page scrolls (spec 010). Keep it in step with the minimum width. */
+@media (max-width:1417.98px){.k-scroll{overflow-x:auto}}
 .k-scroll__hint{margin:0;padding:10px 20px;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted)}
 /* `separate`, not `collapse`: sticky cells in collapsed tables misbehave in
    Safari. The borders already live on the cells, so it looks the same. */
@@ -611,8 +615,8 @@ td .k-actions{flex-direction:column;align-items:flex-start}
    stick to the page. `clip` still clips the rounded corners without that
    effect; a browser without `clip` keeps `auto` and simply no sticky header.
    Trade-off: a table wider than its card would be cut with no sign of it;
-   at 1024px and up these tables fit (checked on captures, task 9).
-   Movimientos is left out: it scrolls sideways on purpose. */
+   at 1024px and up these tables fit (checked on captures, task 9), and
+   the wide ones (Movimientos, Pagos) scroll inside a box of their own. */
 @media (min-width:1024px) and (min-height:500px){
   .k-card--sticky-head{overflow-x:clip}
   .k-card--sticky-head .k-table thead th{position:sticky;top:56px;z-index:2;box-shadow:inset 0 -1px 0 var(--border)}
