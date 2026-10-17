@@ -34,7 +34,14 @@
         <form method="get" action="/materials">
             <input type="hidden" name="estado" value="{{ estado }}">
             <input type="hidden" name="precio" value="{{ precio }}">
-            <input class="k-input" type="search" name="q" placeholder="Buscar por nombre o código" value="{{ q }}">
+            {#- A search field that looks like one (spec 010): the magnifier is only
+                a sign (Enter still sends it), the phone keyboard says "Buscar",
+                and the "×" clears the search but keeps the other filters. -#}
+            <span class="k-search">
+                <span class="k-search__icon" aria-hidden="true">🔍</span>
+                <input class="k-input{% if q %} k-input--clearable{% endif %}" type="search" name="q" enterkeyhint="search" placeholder="Buscar por nombre o código" value="{{ q }}">
+                {% if q %}<a class="k-search__clear" href="{{ page_url('/materials', params, q=None) }}" aria-label="Borrar búsqueda">×</a>{% endif %}
+            </span>
         </form>
         {% if user.role == "admin" %}
         <nav class="k-seg">
@@ -69,16 +76,18 @@
                 {% for material in materials %}
                 <tr>
                     {% set unit = unit_labels.get(material.unit, material.unit) %}
+                    {#- What one alternate unit is worth, only when there is one (spec 010). -#}
+                    {% set alt %}{% if material.alt_unit_name %}<span class="k-unit-alt">1 {{ unit_labels.get(material.alt_unit_name, material.alt_unit_name) }} = {{ material.alt_unit_factor | qty }} {{ unit }}</span>{% endif %}{% endset %}
                     {% set price %}{% if material.sale_price is not none %}{{ material.sale_price | cop }}{% else %}<span class="k-tag k-tag--warn">Sin precio</span>{% endif %}{% endset %}
                     <td class="k-dim k-only-table">{{ material.code or "-" }}</td>
                     <td class="k-strong k-c-name">{{ material.name }}</td>
-                    <td class="k-dim k-only-table">{{ unit }}</td>
+                    <td class="k-dim k-only-table">{{ unit }}{{ alt }}</td>
                     <td class="k-num k-only-table">{{ material.min_stock | qty if material.min_stock is not none else "-" }}</td>
                     <td class="k-num k-only-table">{{ price }}</td>
                     <td class="k-c-state"><span class="k-tag{{ ' k-tag--ok' if material.is_active else ' k-tag--neutral' }}">{{ "Activo" if material.is_active else "Inactivo" }}</span></td>
                     <td class="k-only-card k-c-meta k-meta">
                         {%- if material.code %}<span>{{ material.code }}</span>{% endif -%}
-                        <span>{{ unit }}</span>
+                        <span>{{ unit }}</span>{{ alt }}
                         {%- if material.min_stock is not none %}<span>mín. {{ material.min_stock | qty }}</span>{% endif -%}
                         <span>{{ price }}</span>
                     </td>

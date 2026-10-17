@@ -24,7 +24,7 @@
     <p class="k-banner k-banner--ok" id="account-notice">{{ notice }}</p>
     {% endif %}
 
-    <div class="k-kpis">
+    <div class="k-kpis k-kpis--compact k-kpis--home">
         <div class="k-kpi">
             <span class="k-kpi__value">{{ active_materials_count }}</span>
             <span class="k-kpi__label">Artículos activos</span>
@@ -79,7 +79,14 @@
     <div class="k-toolbar" id="saldos">
         <form method="get" action="/">
             <input type="hidden" name="bajo_minimo" value="{{ params.bajo_minimo }}">
-            <input class="k-input" type="search" name="q" placeholder="Buscar por nombre o código" value="{{ q }}">
+            {#- A search field that looks like one (spec 010): the magnifier is only
+                a sign (Enter still sends it), the phone keyboard says "Buscar",
+                and the "×" clears the search but keeps the other filters. -#}
+            <span class="k-search">
+                <span class="k-search__icon" aria-hidden="true">🔍</span>
+                <input class="k-input{% if q %} k-input--clearable{% endif %}" type="search" name="q" enterkeyhint="search" placeholder="Buscar por nombre o código" value="{{ q }}">
+                {% if q %}<a class="k-search__clear" href="{{ page_url('/', params, q=None) }}" aria-label="Borrar búsqueda">×</a>{% endif %}
+            </span>
         </form>
         <nav class="k-seg">
             <a class="{% if only_low %}is-active{% endif %}" href="{{ page_url('/', params, bajo_minimo=None if only_low else '1') }}">Solo bajo el mínimo</a>

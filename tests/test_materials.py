@@ -904,11 +904,18 @@ def test_changing_a_catalog_filter_goes_back_to_page_one(
     _catalog(db_session, 60)
 
     html = admin_client.get("/materials?page=3&q=Mat").text
+    # The search's "×" drops q on purpose (spec 010, EARS-H7-03); it is not a
+    # filter toggle, but it too goes back to page one.
+    clear = html_lib.unescape(
+        re.findall(r'class="k-search__clear" href="([^"]*)"', html)[0]
+    )
+    assert "page" not in _query(clear)
 
     toggles = [
         _query(link)
         for link in _links(html)
         if link.startswith("/materials?")
+        and link != clear
         and (
             "estado" in _query(link)
             and "per_page" not in _query(link)

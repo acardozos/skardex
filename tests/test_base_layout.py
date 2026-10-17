@@ -254,8 +254,10 @@ def test_table_headers_stick_on_desktop(
     assert css.index("overflow-x:clip") > desktop
     assert css.count("thead th{position:sticky") == 1
     assert css.index("thead th{position:sticky") > desktop
+    # The compact paging above: from 720px, touch screens too (EARS-H9-01 of
+    # spec 010, which changes H9-05 here: it used to be mouse only).
     compact = css.index(
-        "@media (min-width:1024px) and (min-height:500px) and (pointer:fine){\n"
+        "@media (min-width:720px) and (min-height:500px){\n"
         "  .k-pager__compact{display:flex}"
     )
     assert css.index(".k-pager__compact{display:none") < compact

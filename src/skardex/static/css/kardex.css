@@ -266,6 +266,20 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .k-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .k-toolbar form{display:contents}
 .k-toolbar .k-input,.k-toolbar .k-select{flex:1 1 220px;min-width:0;background:var(--surface)}
+/* A search field (spec 010): a gray magnifier inside on the left, only a
+   sign, and a "×" on the right while there is a search. WebKit's own clear
+   button is hidden so there are never two. */
+.k-search{position:relative;display:flex;flex:1 1 220px;min-width:0}
+.k-toolbar .k-search .k-input{flex:1 1 auto;padding-left:40px}
+.k-search__icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:15px;line-height:1;filter:grayscale(1);opacity:0.6;pointer-events:none}
+.k-toolbar .k-search .k-input--clearable{padding-right:44px}
+.k-search__clear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:grid;place-items:center;border-radius:6px;font-size:20px;line-height:1;color:var(--muted)}
+.k-search__clear:hover{color:var(--text);background:var(--surface2);text-decoration:none}
+.k-search input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+@media (pointer:coarse){
+  .k-search__clear{width:44px;height:44px;right:0}
+  .k-toolbar .k-search .k-input--clearable{padding-right:48px}
+}
 .k-seg{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px}
 .k-seg a{padding:8px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--muted)}
 .k-seg a:hover{color:var(--text);text-decoration:none}
@@ -426,6 +440,10 @@ a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,s
 .k-table--wide .k-c-user{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* A long note: 3 lines, then "…" (its title has it whole). On an inner
    span: line-clamp needs a box of its own, a table cell is not one. */
+/* What one alternate unit is worth, in Artículos (spec 010): its own small
+   line under the unit in the table; one more item of the card's line. */
+.k-unit-alt{display:block;font-size:12px;color:var(--muted);white-space:nowrap}
+.k-meta > .k-unit-alt{display:inline;font-size:inherit}
 .k-clamp-3{display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 
 /* One card per movement on touch screens and below 1024px: item and
@@ -547,6 +565,14 @@ td .k-actions{flex-direction:column;align-items:flex-start}
 @media (min-width:1024px){
   .k-kpis--compact{grid-template-columns:repeat(auto-fill,minmax(200px,280px))}
 }
+/* On a phone, the Inicio's three counters share one row: figure on top,
+   words below, in two lines at most (spec 010). */
+@media (max-width:479.98px){
+  .k-kpis--home{grid-template-columns:repeat(3,1fr);gap:8px}
+  .k-kpis--home .k-kpi{padding:12px 10px}
+  .k-kpis--home .k-kpi__value{font-size:26px}
+  .k-kpis--home .k-kpi__label{font-size:12px;margin-top:4px}
+}
 /* On a phone, Pagos' counters take two rows instead of three: the total
    across, the two counts side by side, each figure beside its words. */
 @media (max-width:479.98px){
@@ -617,11 +643,14 @@ td .k-actions{flex-direction:column;align-items:flex-start}
 .k-pager__compact{display:none;align-items:center;gap:12px;font-size:13px}
 .k-pager__link{color:var(--accent);font-weight:500}
 .k-pager__link.is-disabled{color:var(--muted);opacity:0.6;pointer-events:none}
-/* Mouse only (pointer:fine): a landscape tablet is 1024px wide too, and
-   these small links are no 44px touch target. Touch keeps the full
-   controls below. */
-@media (min-width:1024px) and (min-height:500px) and (pointer:fine){
+/* From 720px, touch screens too (spec 010, H9): tablets have room for it.
+   Not on phones, also in landscape (low screens): no room there. On touch
+   the links get the 44px target of the controls below. */
+@media (min-width:720px) and (min-height:500px){
   .k-pager__compact{display:flex}
+}
+@media (pointer:coarse){
+  .k-pager__link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
 }
 /* Column headers stay under the app header while the page scrolls. The card
    must stop being a scroll container for that: overflow-x:auto makes it one
