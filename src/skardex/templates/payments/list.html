@@ -25,7 +25,7 @@
     <p class="k-banner k-banner--danger" id="payment-error">{{ error }}</p>
     {% endif %}
 
-    <div class="k-kpis k-kpis--compact">
+    <div class="k-kpis k-kpis--compact k-kpis--pay">
         <div class="k-kpi">
             <span class="k-kpi__value k-kpi__value--money">{{ pending_total | cop }}</span>
             <span class="k-kpi__label">Total pendiente{% if unpriced %} (sin contar las ventas sin precio){% endif %}</span>
@@ -62,7 +62,9 @@
     {% set sales_variant = "k-sales--" ~ ("admin" if user.role == "admin" else "operario") ~ ("-pick" if can_pay else "") ~ ("-pay" if show_pay else "") %}
     {% set note_col = "k-col--note" if show_pay else "k-col--note-wide" %}
     {% if can_pay %}
-    <form class="k-payform" method="post" action="/payments/register" id="payment-form">
+    {#- `data-server-selection`: a failed payment came back with what the
+        admin had ticked; that wins over what the browser remembers. -#}
+    <form class="k-payform" method="post" action="/payments/register" id="payment-form"{% if selected_ids is not none %} data-server-selection{% endif %}>
         {#- First, so the fixed bar at the bottom fits on one line. -#}
         <div class="k-field k-paydate">
             <label class="k-label" for="paid_on">Fecha de pago</label>
@@ -141,15 +143,23 @@
             {% set unit = unit_labels.get(sale.material.unit, sale.material.unit) %}
             {% set can_fix = user.role == "admin" and can_fix_billing(sale) %}
             <li class="k-pcard"{% if can_pay %} data-select-row{% endif %}>
+                {#- The name on a line of its own, so it is never squeezed by the
+                    amount; below it the amount and, outside Pendientes (where
+                    every sale is pending), its state (spec 010). -#}
                 <div class="k-pcard__main">
                     {% if can_pay %}
                     <label class="k-pick"><input type="checkbox" data-twin="{{ sale.id }}" aria-label="Incluir esta venta en el pago" disabled {% if selected_ids is none or sale.id in selected_ids %}checked{% endif %}></label>
                     {% endif %}
-                    <span class="k-strong">{{ sale.material.name }}</span>
+                    <span class="k-strong k-pcard__name">{{ sale.material.name }}</span>
+                </div>
+                <div class="k-pcard__money">
                     {% if sale.is_fully_reversed %}
-                    <span class="k-pcard__amount"><span class="k-tag k-tag--neutral">Reversada</span></span>
+                    <span class="k-tag k-tag--neutral">Reversada</span>
                     {% else %}
                     <span class="k-num k-strong k-pcard__amount">{{ sale.amount | cop }}</span>
+                    {% if estado != "pendientes" %}
+                    <span class="k-pcard__state">{% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> {{ sale.paid_at.strftime('%d/%m/%Y') }}{% else %}<span class="k-tag">Pendiente</span>{% endif %}</span>
+                    {% endif %}
                     {% endif %}
                 </div>
                 {#- The spans touch on purpose: `.k-meta` puts the " · " between them. -#}
@@ -164,9 +174,6 @@
                     {%- if sale.reversed_quantity -%}
                     <span>{{ sale.reversed_quantity | qty }} reversados</span>
                     {%- endif -%}
-                    {%- endif -%}
-                    {%- if estado != "pendientes" and not sale.is_fully_reversed -%}
-                    <span>{% if sale.paid_at %}<span class="k-tag k-tag--ok">Pagada</span> {{ sale.paid_at.strftime('%d/%m/%Y') }}{% else %}<span class="k-tag">Pendiente</span>{% endif %}</span>
                     {%- endif -%}
                 </p>
                 {% if sale.note or can_fix %}
@@ -288,6 +295,25 @@
     const count = document.getElementById("selected-count");
     const boxFor = (id) => boxes.find((box) => box.value === id);
 
+    // What the admin unticked is remembered in this tab only, so it is still
+    // unticked after "Corregir cobro" and back (spec 010, P14). Without
+    // storage (private mode, blocked) everything works as before.
+    const KEY = "kardex-pay-unchecked";
+    function remember() {
+      try {
+        const unticked = boxes.filter((box) => !box.checked).map((box) => box.value);
+        sessionStorage.setItem(KEY, JSON.stringify(unticked));
+      } catch (e) { /* not remembered, as before */ }
+    }
+    function restore() {
+      try {
+        const unticked = JSON.parse(sessionStorage.getItem(KEY) || "[]");
+        // Only sales still listed (still pending); the rest are forgotten
+        // on the next remember().
+        boxes.forEach((box) => { if (unticked.includes(box.value)) box.checked = false; });
+      } catch (e) { /* nothing to restore */ }
+    }
+
     function sync() {
       const chosen = boxes.filter((box) => box.checked);
       // Add in whole cents: floating point would drift on money.
@@ -296,6 +322,7 @@
       count.textContent = chosen.length + " de " + boxes.length + " ventas";
       twins.forEach((twin) => { twin.checked = boxFor(twin.dataset.twin).checked; });
       alls.forEach((all) => { all.checked = chosen.length === boxes.length; });
+      remember();
     }
 
     twins.forEach((twin) => {
@@ -325,8 +352,13 @@
     form.addEventListener("submit", (event) => {
       if (!confirm("¿Registrar el pago de " + count.textContent.split(" de ")[0] + " venta(s) por " + total.textContent + "?")) {
         event.preventDefault();
+        return;
       }
+      // Paid: forget it. A payment that fails comes back with the server's
+      // selection, which is remembered again from there.
+      try { sessionStorage.removeItem(KEY); } catch (e) { /* nothing kept */ }
     });
+    if (!form.hasAttribute("data-server-selection")) restore();
     sync();
   })();
 </script>

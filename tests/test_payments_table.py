@@ -193,7 +193,10 @@ def test_the_tables_have_fixed_layout_and_the_counters_a_max_width() -> None:
 
 def test_the_counters_use_the_compact_grid(admin_client: TestClient) -> None:
     """EARS-H2-07"""
-    assert '<div class="k-kpis k-kpis--compact">' in admin_client.get("/payments").text
+    assert (
+        '<div class="k-kpis k-kpis--compact k-kpis--pay">'
+        in admin_client.get("/payments").text
+    )
 
 
 def test_the_header_corners_follow_the_card_curve() -> None:

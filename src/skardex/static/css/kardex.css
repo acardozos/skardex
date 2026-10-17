@@ -219,7 +219,7 @@ h1,h2,h3{margin:0;font-weight:700;letter-spacing:-0.02em}
   .k-table--cards tr{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
   .k-table--cards tr:last-child{border-bottom:none}
   .k-table--cards td{display:block;padding:0;border:none;text-align:left}
-  .k-table--cards .k-only-table,.k-table--cards .is-empty{display:none}
+  .k-table--cards .k-only-table,.k-table--cards .k-only-wide,.k-table--cards .is-empty{display:none}
   .k-table--cards .k-only-card{display:block}
   .k-table--cards .k-actions{justify-content:flex-start}
   .k-table--cards .k-c-name{grid-area:name}
@@ -547,6 +547,16 @@ td .k-actions{flex-direction:column;align-items:flex-start}
 @media (min-width:1024px){
   .k-kpis--compact{grid-template-columns:repeat(auto-fill,minmax(200px,280px))}
 }
+/* On a phone, Pagos' counters take two rows instead of three: the total
+   across, the two counts side by side, each figure beside its words. */
+@media (max-width:479.98px){
+  .k-kpis--pay{grid-template-columns:1fr 1fr;gap:10px}
+  .k-kpis--pay .k-kpi{padding:12px 14px}
+  .k-kpis--pay .k-kpi:first-child,.k-kpis--pay .k-kpi:nth-child(2):last-child{grid-column:1 / -1}
+  .k-kpis--pay .k-kpi + .k-kpi{flex-direction:row;align-items:baseline;gap:8px}
+  .k-kpis--pay .k-kpi + .k-kpi .k-kpi__value{font-size:24px}
+  .k-kpis--pay .k-kpi + .k-kpi .k-kpi__label{margin-top:0}
+}
 
 /* ---------- Pagos: touch selection and fixed pay bar (spec 007, H3) ---------- */
 /* A money KPI shrinks its figure to fit its own card, not the screen: the
@@ -565,7 +575,11 @@ td .k-actions{flex-direction:column;align-items:flex-start}
 .k-pcard:last-child{border-bottom:none}
 .k-pcard .k-strong{font-weight:500}
 .k-pcard__main{display:flex;align-items:center;gap:10px}
-.k-pcard__amount{margin-left:auto}
+/* Spec 010: the amount on a line of its own, under the name, with the state
+   (outside Pendientes) on the right; the state drops below if it does not
+   fit beside it, rather than squeezing the amount. */
+.k-pcard__money{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px}
+.k-pcard__state{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);white-space:nowrap}
 .k-pcard__meta{margin:0;font-size:13px;color:var(--muted)}
 .k-pcard__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
 .k-pcard__note{margin:0;font-size:14px;color:var(--muted)}
